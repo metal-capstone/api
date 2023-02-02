@@ -8,7 +8,6 @@
             "name": "Python: Start and attach to API",
             "type": "python",
             "request": "attach",
-            // "preLaunchTask": "Wait for api to start",
             "connect": {
                 "host": "localhost",
                 "port": 5678
@@ -16,7 +15,7 @@
             "pathMappings": [
                 {
                     "localRoot": "${workspaceFolder}",
-                    "remoteRoot": "/api" // TODO: Figure out why this needs to be /app for the debugger to work.
+                    "remoteRoot": "/api"
                 }
             ],
             // "justMyCode": true
