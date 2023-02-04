@@ -78,10 +78,11 @@ async def root():
     user_params = {
         "limit": 50
     }
-    user_info = requests.get("https://api.spotify.com/v1/me", params=user_params, headers=user_headers)
-    return { "username": user_info.json()['display_name'], "profile_pic": user_info.json()['images'] }
+    user_info_response = requests.get("https://api.spotify.com/v1/me", params=user_params, headers=user_headers)
+    user_info = user_info_response.json()
+    return { "username": user_info['display_name'], "profile_pic": user_info['images'][0]['url'] }
 
-# this is just an example endpoint to show how to query info
+# this is just an example endpoint to show how to query info, this will get the users most listen to songs of the past 6 months
 @app.get("/user-top-songs")
 async def root():
     user_headers = {
@@ -92,6 +93,7 @@ async def root():
         "limit": 50,
         "time_range": "medium_term"
     }
-    user_tracks = requests.get("https://api.spotify.com/v1/me/top/tracks", params=user_params, headers=user_headers)
-    return { "songs": user_tracks.json() }
+    user_tracks_response = requests.get("https://api.spotify.com/v1/me/top/tracks", params=user_params, headers=user_headers)
+    user_tracks = user_tracks_response.json()
+    return { "songs": user_tracks['items'] }
 
