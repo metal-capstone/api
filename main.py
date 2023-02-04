@@ -24,7 +24,7 @@ app.add_middleware(
 
 creds = json.load(open('credentials.json')) # load in creds from json file
 
-app.scope = "user-read-private user-read-email user-top-read"
+app.scope = "user-read-private user-read-email user-top-read" # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
 app.state = '' # TODO update api to work with multiple users, this should be per user not global. Still could work with multiple user might be issues if multiple are signing in at the same time
 app.access_token = ''
 app.refresh_token = ''
@@ -36,7 +36,9 @@ async def root():
 # Endpoint that generates the authorization url for the user
 @app.get("/spotify-login")
 async def root():
+    # random state to check if callback request is legitimate
     app.state = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+    # builds auth url from credentials and scope
     authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + creds['spotify_client_id'] + '&scope=' + app.scope + '&redirect_uri=http://localhost:8000/callback&state=' + app.state
     return { "auth_url": authorizeLink }
 
