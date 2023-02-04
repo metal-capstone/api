@@ -5,6 +5,7 @@ import string
 import random
 import json
 import requests
+import base64
 
 app = FastAPI()
 
@@ -25,20 +26,72 @@ creds = json.load(open('credentials.json')) # load in creds from json file
 
 app.scope = "user-read-private user-read-email user-top-read"
 app.state = '' # TODO update api to work with multiple users, this should be per user not global. Still could work with multiple user might be issues if multiple are signing in at the same time
+app.access_token = ''
+app.refresh_token = ''
 
 @app.get("/")
 async def root():
     return {"message": "api is running"}
 
+# Endpoint that generates the authorization url for the user
 @app.get("/spotify-login")
 async def root():
     app.state = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
     authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + creds['spotify_client_id'] + '&scope=' + app.scope + '&redirect_uri=http://localhost:8000/callback&state=' + app.state
-    return RedirectResponse(authorizeLink, status_code=303)
+    return { "auth_url": authorizeLink }
 
-@app.get("/callback")
+# Endpoint for the callback from the spotify login, updates access token and redirect user to dashboard when successful.
+@app.get("/callback") # TODO update so error is redirected to front end with error message, probably by sending an error code
 async def root(code: str, state: str):
-    if (state != app.state):
+    if (state != app.state): # simple check to see if request is from spotify
         return {"message": "state_mismatch"}
     else:
         app.state = ""
+        encoded_credentials = base64.b64encode(creds['spotify_client_id'].encode() + b':' + creds['spotify_client_secret'].encode()).decode("utf-8")
+        headers = {
+            "Authorization": "Basic " + encoded_credentials,
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+
+        payload = {
+            'grant_type': 'authorization_code',
+            'code': code, #use auth code granted from user to get access token
+            'redirect_uri': 'http://localhost:8000/callback'
+        }
+
+        access_token_request = requests.post(url="https://accounts.spotify.com/api/token", data=payload, headers=headers)
+
+        if (access_token_request.status_code == 200): #upon token success, store tokens and redirect
+            app.access_token = access_token_request.json()["access_token"]
+            app.refresh_token = access_token_request.json()["refresh_token"]
+            return RedirectResponse("http://localhost:3000/dashboard", status_code=303)
+        else:
+            return {"message": "invalid_token"}
+
+# Endpoint to get current users username and url to profile pic
+@app.get("/user-info") # TODO Add some check that there is current user, send error if not
+async def root():
+    user_headers = {
+        "Authorization": "Bearer " + app.access_token,
+        "Content-Type": "application/json"
+    }
+    user_params = {
+        "limit": 50
+    }
+    user_info = requests.get("https://api.spotify.com/v1/me", params=user_params, headers=user_headers)
+    return { "username": user_info.json()['display_name'], "profile_pic": user_info.json()['images'] }
+
+# this is just an example endpoint to show how to query info
+@app.get("/user-top-songs")
+async def root():
+    user_headers = {
+        "Authorization": "Bearer " + app.access_token,
+        "Content-Type": "application/json"
+    }
+    user_params = {
+        "limit": 50,
+        "time_range": "medium_term"
+    }
+    user_tracks = requests.get("https://api.spotify.com/v1/me/top/tracks", params=user_params, headers=user_headers)
+    return { "songs": user_tracks.json() }
+
