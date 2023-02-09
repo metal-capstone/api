@@ -28,14 +28,3 @@ uvicorn main:app --reload
 2. Select the Run and Debug tab on the left bar.
 3. Choose `Python: Start and attach to API`.
 4. Press the green play button next to it.
-
-
-## Set up database connection
-Create a `secrets.json` file in the api folder. Add the contents below to this file.
-```json
-{
-    "mongodb-database-url": "<mongodb_database_url>",
-    "mongodb-cluster-name": "<mongodb_cluster_name>"
-}
-```
-Update the fields with correct database secret info.

@@ -1,10 +1,10 @@
 import json
 import models
 
-secrets_json = json.load(open("secrets.json"))
-MONGODB_DATABASE_URL = secrets_json["mongodb-database-url"]
-MONGODB_CLUSTER_NAME = secrets_json["mongodb-cluster-name"]
-del secrets_json
+credentials_json = json.load(open("credentials.json"))
+MONGODB_DATABASE_URL = credentials_json["mongodb-database-url"]
+MONGODB_CLUSTER_NAME = credentials_json["mongodb-cluster-name"]
+del credentials_json
 
 def test_mongodb(db) -> models.TestData:
     response = db["test-collection"].find_one({"message": "MongoDB connection is working"})
