@@ -8,6 +8,7 @@ import requests
 import base64
 from pymongo import MongoClient
 import database
+import models
 
 app = FastAPI()
 
@@ -114,5 +115,5 @@ async def root():
 
 @app.get("/test-mongodb")
 async def test_mongodb():
-    response = database.test_mongodb(app.database)
+    response: models.TestData = database.test_mongodb(app.database)
     return response
