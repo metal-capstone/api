@@ -3,3 +3,4 @@ node_modules/
 __pycache__/
 # ignore credentials for security
 credentials.json
+secrets.json
