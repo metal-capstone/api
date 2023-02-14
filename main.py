@@ -6,6 +6,9 @@ import random
 import json
 import requests
 import base64
+from pymongo import MongoClient
+import database
+import models
 
 app = FastAPI()
 
@@ -28,6 +31,17 @@ app.scope = "user-read-private user-read-email user-top-read" # This is the scop
 app.state = '' # TODO update api to work with multiple users, this should be per user not global. Still could work with multiple user might be issues if multiple are signing in at the same time
 app.access_token = ''
 app.refresh_token = ''
+
+@app.on_event("startup")
+def startup_db_client():
+    app.mongodb_client = MongoClient(database.MONGODB_DATABASE_URL)
+    app.database = app.mongodb_client[database.MONGODB_CLUSTER_NAME]
+
+    database.test_mongodb(app.database)
+
+@app.on_event("shutdown")
+def shutdown_db_client():
+    app.mongodb_client.close()
 
 @app.get("/")
 async def root():
@@ -99,3 +113,7 @@ async def root():
     user_tracks = user_tracks_response.json()
     return { "songs": user_tracks['items'] }
 
+@app.get("/test-mongodb")
+async def test_mongodb():
+    response: models.TestData = database.test_mongodb(app.database)
+    return response
