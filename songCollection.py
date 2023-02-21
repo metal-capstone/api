@@ -148,18 +148,19 @@ def getAudioFeatures(user_headers, users_related_artists_top_songs):
         audio_features_data = json_response['audio_features']
         
         for data in audio_features_data:
-            uri = data['uri'][prefixLength:]
-            print(uri)
-            acousticness = data['acousticness']
-            danceability = data['danceability']
-            liveness = data['liveness']
-            valence = data['valence']
-            energy = data['energy']
-            print("Acousticness: " + str(acousticness))
-            print("Danceability: " + str(danceability))
-            print("Liveness: " + str(liveness))
-            print("Valence: " + str(valence))
-            print("Energy: " + str(energy))
+            if data is not None:
+                uri = data['uri'][prefixLength:]
+                print(uri)
+                acousticness = data['acousticness']
+                danceability = data['danceability']
+                liveness = data['liveness']
+                valence = data['valence']
+                energy = data['energy']
+                print("Acousticness: " + str(acousticness))
+                print("Danceability: " + str(danceability))
+                print("Liveness: " + str(liveness))
+                print("Valence: " + str(valence))
+                print("Energy: " + str(energy))
 
         start += 100
         end += 100    
