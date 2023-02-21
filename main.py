@@ -10,6 +10,8 @@ from pymongo import MongoClient
 import database
 import models
 
+from songCollection import *
+
 app = FastAPI()
 
 origins = [
@@ -27,7 +29,7 @@ app.add_middleware(
 
 creds = json.load(open('credentials.json')) # load in creds from json file
 
-app.scope = "user-read-private user-read-email user-top-read" # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
+app.scope = "user-read-private user-read-email user-top-read user-follow-read user-library-read" # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
 app.state = '' # TODO update api to work with multiple users, this should be per user not global. Still could work with multiple user might be issues if multiple are signing in at the same time
 app.access_token = ''
 app.refresh_token = ''
@@ -80,6 +82,9 @@ async def root(code: str, state: str):
         if (access_token_request.status_code == 200): #upon token success, store tokens and redirect
             app.access_token = access_token_request.json()["access_token"]
             app.refresh_token = access_token_request.json()["refresh_token"]
+
+            songCollection(app.access_token)
+
             return RedirectResponse("http://localhost:3000/dashboard", status_code=303)
         else:
             return {"message": "invalid_token"}
