@@ -21,7 +21,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -102,21 +102,6 @@ async def root():
     user_info_response = requests.get("https://api.spotify.com/v1/me", params=user_params, headers=user_headers)
     user_info = user_info_response.json()
     return { "username": user_info['display_name'], "profile_pic": user_info['images'][0]['url'] }
-
-# this is just an example endpoint to show how to query info, this will get the users most listen to songs of the past 6 months
-@app.get("/user-top-songs")
-async def root():
-    user_headers = {
-        "Authorization": "Bearer " + app.access_token,
-        "Content-Type": "application/json"
-    }
-    user_params = {
-        "limit": 50,
-        "time_range": "medium_term"
-    }
-    user_tracks_response = requests.get("https://api.spotify.com/v1/me/top/tracks", params=user_params, headers=user_headers)
-    user_tracks = user_tracks_response.json()
-    return { "songs": user_tracks['items'] }
 
 @app.get("/test-mongodb")
 async def test_mongodb():
