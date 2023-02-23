@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import string
@@ -83,7 +83,7 @@ async def root(code: str, state: str):
             app.access_token = access_token_request.json()["access_token"]
             app.refresh_token = access_token_request.json()["refresh_token"]
 
-            songCollection(app.access_token)
+            #songCollection(app.access_token)
 
             return RedirectResponse("http://localhost:3000/dashboard", status_code=303)
         else:
@@ -122,3 +122,10 @@ async def root():
 async def test_mongodb():
     response: models.TestData = database.test_mongodb(app.database)
     return response
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        await websocket.send_text(f"Message text was: {data}")
