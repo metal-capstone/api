@@ -11,6 +11,7 @@ import database
 import models
 
 from songCollection import *
+from spotify import *
 
 app = FastAPI()
 
@@ -89,20 +90,6 @@ async def root(code: str, state: str):
         else:
             return {"message": "invalid_token"}
 
-# Endpoint to get current users username and url to profile pic
-@app.get("/user-info") # TODO Add some check that there is current user, send error if not
-async def root():
-    user_headers = {
-        "Authorization": "Bearer " + app.access_token,
-        "Content-Type": "application/json"
-    }
-    user_params = {
-        "limit": 50
-    }
-    user_info_response = requests.get("https://api.spotify.com/v1/me", params=user_params, headers=user_headers)
-    user_info = user_info_response.json()
-    return { "username": user_info['display_name'], "profile_pic": user_info['images'][0]['url'] }
-
 @app.get("/test-mongodb")
 async def test_mongodb():
     response: models.TestData = database.test_mongodb(app.database)
@@ -111,6 +98,7 @@ async def test_mongodb():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    await websocket.send_json(getUserInfo(app.access_token))
     while True:
         data = await websocket.receive_text()
-        await websocket.send_text(f"Your message was {data}")
+        await websocket.send_json({"type":"message", "message": f"Your message was {data}"})
