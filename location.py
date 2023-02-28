@@ -5,8 +5,8 @@ credentials_json = json.load(open("credentials.json"))
 apiKey = credentials_json["maps_key"]
 
 
-def getPlace(apiKey):
-
+def getPlace():
+    apiKey = credentials_json["maps_key"]
     # Get user's geolocation
     geoloc = requests.post(
         "https://www.googleapis.com/geolocation/v1/geolocate?key="+apiKey).json()
@@ -37,7 +37,5 @@ def getPlace(apiKey):
         "https://maps.googleapis.com/maps/api/place/details/json?place_id=" + placeID + "&fields=types&key="+apiKey).json()
 
     placeType = placeDetails['result']['types'][0]
+
     return placeType
-
-
-print(getPlace(apiKey))
