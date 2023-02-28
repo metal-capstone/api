@@ -1,10 +1,13 @@
 import requests
 import json
+import pymongo
+import sys
+import certifi
 
 credentials_json = json.load(open("credentials.json"))
-
 client = credentials_json["spotify_client_id"]
 secret = credentials_json["spotify_client_secret"]
+
 
 auth_url = 'https://accounts.spotify.com/api/token'
 data = {
@@ -12,6 +15,14 @@ data = {
     'client_id': client,
     'client_secret': secret
 }
+
+dbClient = pymongo.MongoClient(
+    "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
+
+myDB = dbClient["PlaceClusters"]
+
+collection = myDB["PlaceType"]
+
 
 auth_response = requests.post(auth_url, data=data).json()
 token = auth_response['access_token']
@@ -29,20 +40,38 @@ trackNum = 0
 
 gymPlaylists = ["37i9dQZF1DWTl4y3vgJOXW",
                 "37i9dQZF1DX8CwbNGNKurt", "37i9dQZF1DX5gQonLbZD9s"]
-for x in range(len(gymPlaylists)):
-    gymids = ""
+
+
+libraryPlaylists = ["37i9dQZF1DX8NTLI2TtZa6",
+                    "37i9dQZF1DX9sIqqvKsjG8", "37i9dQZF1DWZeKCadgRdKQ"]
+
+
+barPlaylists = ["5xS3Gi0fA3Uo6RScucyct6",
+                "5fAcG9Ac4qqGJJ3udoI1rt", "4ZO8nLqmmVX0y0PZfarUH4"]
+
+
+restaurantPlaylists = ["2UJd3dltnIGkMqhAbQSkbS",
+                       "345eEKyGNyluygzMsS1n1H", "4JFuLQEnxDu8UQUgGGzZzm"]
+
+cafePlaylists = ["37i9dQZF1DXa1BeMIGX5Du",
+                 "3gEQvSqzd61hRcwj0jUpL2", "2UdyLLfoU9RxSMOSQeHjRl"]
+
+for x in range(len(cafePlaylists)):
+    ids = ""
     headers = {"Authorization": "Bearer " + token}
-    tracks = requests.get("https://api.spotify.com/v1/playlists/"+gymPlaylists[x] +
+    tracks = requests.get("https://api.spotify.com/v1/playlists/"+cafePlaylists[x] +
                           "/tracks?market=ES&fields=items(track(name%2Chref%2Cid))", headers=headers).json()
+
     for i in range(len(tracks["items"])):
-        gymids = gymids + str(tracks["items"][i]["track"]["id"]) + ","
+        ids = ids + str(tracks["items"][i]["track"]["id"]) + ","
 
     trackNum = trackNum + len(tracks["items"])
 
     trackData = requests.get(
-        "https://api.spotify.com/v1/audio-features?ids=" + gymids, headers=headers).json()
+        "https://api.spotify.com/v1/audio-features?ids=" + ids, headers=headers).json()
 
     for i in range(len(trackData["audio_features"])):
+
         danceability = danceability + \
             trackData["audio_features"][i]["danceability"]
         energy = energy + trackData["audio_features"][i]["energy"]
@@ -57,6 +86,7 @@ for x in range(len(gymPlaylists)):
             trackData["audio_features"][i]["tempo"]
         valence = valence + trackData["audio_features"][i]["valence"]
 
+
 danceability = danceability / trackNum
 energy = energy / trackNum
 instrumentalness = instrumentalness / trackNum
@@ -66,11 +96,28 @@ speechiness = speechiness / trackNum
 tempo = tempo / trackNum
 valence = valence / trackNum
 
-print(danceability)
-print(energy)
-print(instrumentalness)
-print(liveness)
-print(loudness)
-print(speechiness)
-print(tempo)
-print(valence)
+Cafe = {
+    "Place": "Cafe",
+    "danceability": danceability,
+    "energy": energy,
+    "instrumentalness": instrumentalness,
+    "liveness": liveness,
+    "loudness": loudness,
+    "speechiness": speechiness,
+    "tempo": tempo,
+    "valence": valence
+}
+
+
+x = collection.insert_one(Cafe)
+print(x)
+
+
+# print("danceability: " + str(danceability))
+# print("energy: " + str(energy))
+# print("instrumentalness: " + str(instrumentalness))
+# print("liveness: " + str(liveness))
+# print("loudness: " + str(loudness))
+# print("speechiness: " + str(speechiness))
+# print("tempo: " + str(tempo))
+# print("valence: " + str(valence))
