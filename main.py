@@ -11,6 +11,7 @@ import database
 import models
 
 from songCollection import *
+from dbPopulation import *
 
 app = FastAPI()
 
@@ -83,7 +84,9 @@ async def root(code: str, state: str):
             app.access_token = access_token_request.json()["access_token"]
             app.refresh_token = access_token_request.json()["refresh_token"]
 
-            songCollection(app.access_token)
+            print('hello')
+            features_saved_songs, features_top_songs, features_related_top_songs = songCollection(app.access_token)
+            databasePopulation(features_saved_songs, features_top_songs, features_related_top_songs)
 
             return RedirectResponse("http://localhost:3000/dashboard", status_code=303)
         else:

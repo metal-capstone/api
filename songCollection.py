@@ -131,13 +131,13 @@ def getUsersSongs(user_headers, users_top_artists, users_top_related_artists):
 
 #takes 23 seconds uptill this point
             
-def getAudioFeatures(user_headers, users_related_artists_top_songs):
+def getAudioFeatures(user_headers, songs):
     prefixLength = len('spotify:track:')
-    songs_list = list(users_related_artists_top_songs)
+    songs_list = list(songs)
+    featureList = []
     total = len(songs_list)
     start = 0
     end = 100
-    count = 0
     while start < total:
         songs_sublist = songs_list[start:end]
         songs_str = ",".join(songs_sublist)
@@ -149,22 +149,35 @@ def getAudioFeatures(user_headers, users_related_artists_top_songs):
         
         for data in audio_features_data:
             if data is not None:
+                songFeatures = {}
                 uri = data['uri'][prefixLength:]
-                print(uri)
                 acousticness = data['acousticness']
                 danceability = data['danceability']
                 liveness = data['liveness']
                 valence = data['valence']
                 energy = data['energy']
+
+                songFeatures[uri] = uri
+                songFeatures[acousticness] = acousticness
+                songFeatures[danceability] = danceability
+                songFeatures[liveness] = liveness
+                songFeatures[valence] = valence
+                songFeatures[energy] = energy
+                featureList.append(songFeatures)
+
+                '''
+                print(uri)
                 print("Acousticness: " + str(acousticness))
                 print("Danceability: " + str(danceability))
                 print("Liveness: " + str(liveness))
                 print("Valence: " + str(valence))
-                print("Energy: " + str(energy))
+                print("Energy: " + str(energy))'''
 
         start += 100
         end += 100    
-    print(total)
+    #print(total)
+    return featureList
+
 
 def songCollection(token):
     user_headers = {
@@ -173,25 +186,14 @@ def songCollection(token):
     }
 
     users_top_artists, users_top_related_artists = getUsersArtists(user_headers)
+    print('1')
     users_saved_songs, users_artists_top_songs, users_related_artists_top_songs = getUsersSongs(user_headers, users_top_artists, users_top_related_artists)
-    #features_saved_songs = getAudioFeatures(user_headers, users_related_artists_top_songs)
+    print('2')
+    features_saved_songs = getAudioFeatures(user_headers, users_saved_songs)
+    print('3')
+    features_top_songs = getAudioFeatures(user_headers, users_artists_top_songs)
+    print('4')
+    features_related_top_songs = getAudioFeatures(user_headers, users_related_artists_top_songs)
+    print(features_related_top_songs)
 
-    print("These are the users top 30 artists:")
-    print(users_top_artists)
-    print("These are the top songs of those 30 artists:")
-    print(users_artists_top_songs)
-    print("These are the audio features for those songs:")
-    getAudioFeatures(user_headers, users_artists_top_songs)
-'''
-
-    print("These are artists related to the users top 30 artists:")
-    print(users_top_related_artists)
-    print()
-
-
-
-    print("These are the top songs of those related artists:")
-    print(users_related_artists_top_songs)
-
-    print("These are the users saved songs:")
-    print(users_saved_songs)'''
+    return features_saved_songs, features_top_songs, features_related_top_songs
