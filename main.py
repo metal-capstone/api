@@ -142,10 +142,10 @@ async def root():
     return {"songs": user_tracks['items']}
 
 
-# @app.get("/test-mongodb")
-# async def test_mongodb():
-    #response: models.TestData = database.test_mongodb(app.database)
-    # return response
+@app.get("/test-mongodb")
+async def test_mongodb():
+    response: models.TestData = database.test_mongodb(app.database)
+    return response
 
 
 @app.get("/test-location")
