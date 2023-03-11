@@ -37,7 +37,7 @@ class WebsocketRequest(BaseModel):
 
 credentials = json.load(open('credentials.json')) # load in credentials from json file
 
-app.scope = "user-read-private user-read-email user-top-read user-follow-read user-library-read" # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
+app.scope = "user-read-private user-read-email user-top-read user-follow-read user-library-read user-read-playback-state user-modify-playback-state" # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
 app.states = {} # dict of tokens for all logged in users, theres definitely a better way to do this but it works for now
 
 @app.on_event("startup")
@@ -58,7 +58,7 @@ async def root():
 # Endpoint that generates the authorization url for the user
 @app.get("/spotify-login")
 async def root():
-    # random state to check if callback request is legitimate
+    # random state to check if callback request is legitimate, and for identifying user in future callbacks
     state = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
     app.states[state] = ['', '']
     # builds auth url from credentials and scope
@@ -104,10 +104,11 @@ async def test_mongodb():
 async def websocket_endpoint(websocket: WebSocket, state: str):
     await websocket.accept()
     await websocket.send_json(getUserInfo(app.states[state][0]))
+    await websocket.send_json({"type":"spotify-token", "token":app.states[state][0]})
     try:
         while True:
             data = await websocket.receive_text()
-            if (data.startswith('!')):
+            if (data.startswith('!state')):
                 await websocket.send_json({"type":"message", "message": f"State: {state}"})
             else:
                 await websocket.send_json({"type":"message", "message": f"Your message was {data}"})
