@@ -10,6 +10,9 @@ client = credentials_json["spotify_client_id"]
 secret = credentials_json["spotify_client_secret"]
 
 
+def weightSongs():
+
+
 dbClient = pymongo.MongoClient(
     "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
 
