@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import string
 import random
 import json
@@ -11,6 +12,7 @@ import database
 import models
 
 from songCollection import *
+from spotify import *
 from location import *
 
 app = FastAPI()
@@ -28,14 +30,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-creds = json.load(open('credentials.json'))  # load in creds from json file
+class WebsocketRequest(BaseModel):
+    websocket: WebSocket
+    state: str
+    class Config:
+        arbitrary_types_allowed = True
 
-# This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
-app.scope = "user-read-private user-read-email user-top-read user-follow-read user-library-read"
-app.state = ''  # TODO update api to work with multiple users, this should be per user not global. Still could work with multiple user might be issues if multiple are signing in at the same time
-app.access_token = ''
-app.refresh_token = ''
+credentials = json.load(open('credentials.json')) # load in credentials from json file
 
+app.scope = "user-read-private user-read-email user-top-read user-follow-read user-library-read user-read-playback-state user-modify-playback-state" # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
+app.states = {} # dict of tokens for all logged in users, theres definitely a better way to do this but it works for now
 
 @app.on_event("startup")
 def startup_db_client():
@@ -59,27 +63,23 @@ async def root():
 
 @app.get("/spotify-login")
 async def root():
-    # random state to check if callback request is legitimate
-    app.state = ''.join(random.choices(
-        string.ascii_letters + string.digits, k=16))
+    # random state to check if callback request is legitimate, and for identifying user in future callbacks
+    state = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+    app.states[state] = ['', '']
     # builds auth url from credentials and scope
-    authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + \
-        creds['spotify_client_id'] + '&scope=' + app.scope + \
-        '&redirect_uri=http://localhost:8000/callback&state=' + app.state
-    return {"auth_url": authorizeLink}
+    authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + credentials['spotify_client_id'] + '&scope=' + app.scope + '&redirect_uri=http://localhost:8000/callback&state=' + state
+    return { "auth_url": authorizeLink, "state": state }
 
 # Endpoint for the callback from the spotify login, updates access token and redirect user to dashboard when successful.
 
 
 # TODO update so error is redirected to front end with error message, probably by sending an error code
 @app.get("/callback")
-async def root(code: str, state: str):
-    if (state != app.state):  # simple check to see if request is from spotify
+async def root(code: str, state: str, background_tasks: BackgroundTasks):
+    if (state not in app.states): # simple check to see if request is from spotify
         return {"message": "state_mismatch"}
     else:
-        app.state = ""
-        encoded_credentials = base64.b64encode(creds['spotify_client_id'].encode(
-        ) + b':' + creds['spotify_client_secret'].encode()).decode("utf-8")
+        encoded_credentials = base64.b64encode(credentials['spotify_client_id'].encode() + b':' + credentials['spotify_client_secret'].encode()).decode("utf-8")
         headers = {
             "Authorization": "Basic " + encoded_credentials,
             "Content-Type": "application/x-www-form-urlencoded"
@@ -94,61 +94,32 @@ async def root(code: str, state: str):
         access_token_request = requests.post(
             url="https://accounts.spotify.com/api/token", data=payload, headers=headers)
 
-        # upon token success, store tokens and redirect
-        if (access_token_request.status_code == 200):
-            app.access_token = access_token_request.json()["access_token"]
-            app.refresh_token = access_token_request.json()["refresh_token"]
+        if (access_token_request.status_code == 200): #upon token success, store tokens and redirect
+            app.states[state][0] = access_token_request.json()["access_token"]
+            app.states[state][1] = access_token_request.json()["refresh_token"]
 
-            songCollection(app.access_token)
+            background_tasks.add_task(songCollection, app.states[state][0])
 
             return RedirectResponse("http://localhost:3000/dashboard", status_code=303)
         else:
             return {"message": "invalid_token"}
-
-# Endpoint to get current users username and url to profile pic
-
-
-# TODO Add some check that there is current user, send error if not
-@app.get("/user-info")
-async def root():
-    user_headers = {
-        "Authorization": "Bearer " + app.access_token,
-        "Content-Type": "application/json"
-    }
-    user_params = {
-        "limit": 50
-    }
-    user_info_response = requests.get(
-        "https://api.spotify.com/v1/me", params=user_params, headers=user_headers)
-    user_info = user_info_response.json()
-    return {"username": user_info['display_name'], "profile_pic": user_info['images'][0]['url']}
-
-# this is just an example endpoint to show how to query info, this will get the users most listen to songs of the past 6 months
-
-
-@app.get("/user-top-songs")
-async def root():
-    user_headers = {
-        "Authorization": "Bearer " + app.access_token,
-        "Content-Type": "application/json"
-    }
-    user_params = {
-        "limit": 50,
-        "time_range": "medium_term"
-    }
-    user_tracks_response = requests.get(
-        "https://api.spotify.com/v1/me/top/tracks", params=user_params, headers=user_headers)
-    user_tracks = user_tracks_response.json()
-    return {"songs": user_tracks['items']}
-
 
 @app.get("/test-mongodb")
 async def test_mongodb():
     response: models.TestData = database.test_mongodb(app.database)
     return response
 
-
-@app.get("/test-location")
-async def test_location():
-    response = getPlace()
-    return response
+@app.websocket("/{state}/ws")
+async def websocket_endpoint(websocket: WebSocket, state: str):
+    await websocket.accept()
+    await websocket.send_json(getUserInfo(app.states[state][0]))
+    await websocket.send_json({"type":"spotify-token", "token":app.states[state][0]})
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if (data.startswith('!state')):
+                await websocket.send_json({"type":"message", "message": f"State: {state}"})
+            else:
+                await websocket.send_json({"type":"message", "message": f"Your message was {data}"})
+    except WebSocketDisconnect:
+        print('User Disconnected')
