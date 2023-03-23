@@ -13,6 +13,7 @@ import models
 
 from songCollection import *
 from spotify import *
+from location import *
 
 app = FastAPI()
 
@@ -47,15 +48,19 @@ def startup_db_client():
 
     database.test_mongodb(app.database)
 
+
 @app.on_event("shutdown")
 def shutdown_db_client():
     app.mongodb_client.close()
+
 
 @app.get("/")
 async def root():
     return {"message": "api is running"}
 
 # Endpoint that generates the authorization url for the user
+
+
 @app.get("/spotify-login")
 async def root():
     # random state to check if callback request is legitimate, and for identifying user in future callbacks
@@ -66,7 +71,10 @@ async def root():
     return { "auth_url": authorizeLink, "state": state }
 
 # Endpoint for the callback from the spotify login, updates access token and redirect user to dashboard when successful.
-@app.get("/callback") # TODO update so error is redirected to front end with error message, probably by sending an error code
+
+
+# TODO update so error is redirected to front end with error message, probably by sending an error code
+@app.get("/callback")
 async def root(code: str, state: str):
     if (state not in app.states): # simple check to see if request is from spotify
         return {"message": "state_mismatch"}
@@ -79,11 +87,12 @@ async def root(code: str, state: str):
 
         payload = {
             'grant_type': 'authorization_code',
-            'code': code, #use auth code granted from user to get access token
+            'code': code,  # use auth code granted from user to get access token
             'redirect_uri': 'http://localhost:8000/callback'
         }
 
-        access_token_request = requests.post(url="https://accounts.spotify.com/api/token", data=payload, headers=headers)
+        access_token_request = requests.post(
+            url="https://accounts.spotify.com/api/token", data=payload, headers=headers)
 
         if (access_token_request.status_code == 200): #upon token success, store tokens and redirect
             app.states[state][0] = access_token_request.json()["access_token"]
