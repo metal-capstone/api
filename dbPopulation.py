@@ -1,7 +1,9 @@
 import pymongo
 import certifi
 
-#def favSongs(collectionFavSongs, features_saved_songs, features_top_songs):
+def favSongs(collectionFavSongs, features_saved_songs, features_top_songs):
+    collectionFavSongs.insert_many(features_saved_songs)
+    collectionFavSongs.insert_many(features_top_songs)
 
 def relatedSongs(collectionRelatedSongs, features_related_top_songs):
     collectionRelatedSongs.insert_many(features_related_top_songs)
@@ -15,16 +17,5 @@ def databasePopulation(features_saved_songs, features_top_songs, features_relate
     collectionFavSongs = dbSpotifyData["FavSongs"]
     collectionRelatedSongs = dbSpotifyData["RelatedSongs"]
 
-    #favSongs(collectionFavSongs, features_saved_songs, features_top_songs)
+    favSongs(collectionFavSongs, features_saved_songs, features_top_songs)
     relatedSongs(collectionRelatedSongs, features_related_top_songs)
-
-
-
-# print("danceability: " + str(danceability))
-# print("energy: " + str(energy))
-# print("instrumentalness: " + str(instrumentalness))
-# print("liveness: " + str(liveness))
-# print("loudness: " + str(loudness))
-# print("speechiness: " + str(speechiness))
-# print("tempo: " + str(tempo))
-# print("valence: " + str(valence))

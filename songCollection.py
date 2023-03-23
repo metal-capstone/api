@@ -150,19 +150,13 @@ def getAudioFeatures(user_headers, songs):
         for data in audio_features_data:
             if data is not None:
                 songFeatures = {}
-                uri = data['uri'][prefixLength:]
-                acousticness = data['acousticness']
-                danceability = data['danceability']
-                liveness = data['liveness']
-                valence = data['valence']
-                energy = data['energy']
-
-                songFeatures[uri] = uri
-                songFeatures[acousticness] = acousticness
-                songFeatures[danceability] = danceability
-                songFeatures[liveness] = liveness
-                songFeatures[valence] = valence
-                songFeatures[energy] = energy
+                songFeatures["_id"] = data['uri'][prefixLength:]
+                songFeatures["acousticness"] = data['acousticness']
+                songFeatures["danceability"] = data['danceability']
+                songFeatures["liveness"] = data['liveness']
+                songFeatures["valence"] = data['valence']
+                songFeatures["energy"] = data['energy']
+                songFeatures["speechiness"] = data['speechiness']
                 featureList.append(songFeatures)
 
                 '''
@@ -186,14 +180,14 @@ def songCollection(token):
     }
 
     users_top_artists, users_top_related_artists = getUsersArtists(user_headers)
-    print('1')
+    #print('1')
     users_saved_songs, users_artists_top_songs, users_related_artists_top_songs = getUsersSongs(user_headers, users_top_artists, users_top_related_artists)
-    print('2')
+    #print('2')
     features_saved_songs = getAudioFeatures(user_headers, users_saved_songs)
-    print('3')
+    #print('3')
     features_top_songs = getAudioFeatures(user_headers, users_artists_top_songs)
-    print('4')
+    #print('4')
     features_related_top_songs = getAudioFeatures(user_headers, users_related_artists_top_songs)
-    print(features_related_top_songs)
+    #print(features_related_top_songs)
 
     return features_saved_songs, features_top_songs, features_related_top_songs
