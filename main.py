@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -75,7 +75,7 @@ async def root():
 
 # TODO update so error is redirected to front end with error message, probably by sending an error code
 @app.get("/callback")
-async def root(code: str, state: str):
+async def root(code: str, state: str, background_tasks: BackgroundTasks):
     if (state not in app.states): # simple check to see if request is from spotify
         return {"message": "state_mismatch"}
     else:
@@ -98,7 +98,7 @@ async def root(code: str, state: str):
             app.states[state][0] = access_token_request.json()["access_token"]
             app.states[state][1] = access_token_request.json()["refresh_token"]
 
-            #songCollection(app.access_token)
+            background_tasks.add_task(songCollection, app.states[state][0])
 
             return RedirectResponse("http://localhost:3000/dashboard", status_code=303)
         else:
