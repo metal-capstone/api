@@ -12,34 +12,46 @@ secret = credentials_json["spotify_client_secret"]
 
 def weightSongs():
 
+    dbClient = pymongo.MongoClient(
+        "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
 
-dbClient = pymongo.MongoClient(
-    "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
+    placeDB = dbClient["PlaceClusters"]
 
-placeDB = dbClient["PlaceClusters"]
+    placeCollection = placeDB["PlaceType"]
 
-placeCollection = placeDB["PlaceType"]
+    placeType = getPlace()
 
-placeType = getPlace()
+    placeQuery = {"Place": placeType}
 
-placeQuery = {"Place": placeType}
+    placeValues = placeCollection.find_one(placeQuery)
 
-placeValues = placeCollection.find_one(placeQuery)
+    print(placeValues)
 
-print(placeValues)
+    userDB = dbClient["UsersSpotifyData"]
 
-userDB = dbClient["UsersSpotifyData"]
+    userFav = userDB["FavSongs"]
 
-userFav = userDB["FavSongs"]
+    userRel = userDB["RelatedSongs"]
 
-userRel = userDB["RelatedSongs"]
+    songQuery = {"danceability": {
+        "$gte": (placeValues["danceability"]-0.15), "$lte": (placeValues["danceability"]+.15)}, "energy": {
+        "$gte": (placeValues["energy"]-0.15), "$lte": (placeValues["energy"]+.15)}, "valence": {
+        "$gte": (placeValues["valence"]-0.15), "$lte": (placeValues["valence"]+.15)}}
 
-songQuery = {"danceability": {
-    "$gte": (placeValues["danceability"]-0.1), "$lte": (placeValues["danceability"]+.1)}, "energy": {
-    "$gte": (placeValues["energy"]-0.1), "$lte": (placeValues["energy"]+.1)}, "valence": {
-    "$gte": (placeValues["valence"]-0.1), "$lte": (placeValues["valence"]+.1)}}
+    favSongs = userFav.find(songQuery).limit(60)
 
-favSongs = userFav.find(songQuery).limit(45)
+    relSongs = userRel.find(songQuery).limit(30)
+    i = 0
+    for doc in favSongs:
+        print(doc)
+        i = i+1
 
-for doc in favSongs:
-    print(doc)
+    print(i)
+    i = 0
+    for doc in relSongs:
+        print(doc)
+        i = i+1
+    print(i)
+
+
+weightSongs()

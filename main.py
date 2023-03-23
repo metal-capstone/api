@@ -42,7 +42,7 @@ def startup_db_client():
     app.mongodb_client = MongoClient(database.MONGODB_DATABASE_URL)
     app.database = app.mongodb_client[database.MONGODB_CLUSTER_NAME]
 
-    # database.test_mongodb(app.database)
+    database.test_mongodb(app.database)
 
 
 @app.on_event("shutdown")
