@@ -34,13 +34,20 @@ def weightSongs():
     userRel = userDB["RelatedSongs"]
 
     songQuery = {"danceability": {
-        "$gte": (placeValues["danceability"]-0.15), "$lte": (placeValues["danceability"]+.15)}, "energy": {
-        "$gte": (placeValues["energy"]-0.15), "$lte": (placeValues["energy"]+.15)}, "valence": {
-        "$gte": (placeValues["valence"]-0.15), "$lte": (placeValues["valence"]+.15)}}
+        "$gte": (placeValues["danceability"]-0.1), "$lte": (placeValues["danceability"]+.1)}, "energy": {
+        "$gte": (placeValues["energy"]-0.1), "$lte": (placeValues["energy"]+.1)}, "valence": {
+        "$gte": (placeValues["valence"]-0.1), "$lte": (placeValues["valence"]+.1)}}
 
     favSongs = userFav.find(songQuery).limit(60)
 
     relSongs = userRel.find(songQuery).limit(30)
+
+    data = {
+        'name': placeType,
+        'description': "Playlist for " + placeType}
+
+    requests.post(
+        "https://api.spotify.com/v1/users/{user_id}/playlists", data=data)
     i = 0
     for doc in favSongs:
         print(doc)
