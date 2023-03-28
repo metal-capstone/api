@@ -20,7 +20,8 @@ app = FastAPI()
 origins = [
     "http://localhost",
     "http://localhost:3000",
-    "http://localhost:5005"
+    "http://localhost:5005",
+    "http://localhost:5055"
 ]
 
 app.add_middleware(
@@ -133,19 +134,16 @@ async def websocket_endpoint(websocket: WebSocket, state: str):
             if (data.startswith('!state')):
                 await websocket.send_json({"type": "message", "message": f"State: {state}"})
             else:
-                headers = {
-                    "Content-Type": "text/plain"
-                }
-
-                payload = {
-                    'message': data,
-                }
-
-                chatbot_response = requests.post(
-                    url="http://setup-rasa-1:5005/webhooks/rest/webhook", json=payload, headers=headers)
-                response = "Error from chatbot"
-                if (chatbot_response.status_code == 200 and chatbot_response.json()):
-                    response = chatbot_response.json()[0]['text']
+                headers = { 'Content-Type': 'text/plain' }
+                payload = {'message': data, 'sender': state}
+                try:
+                    chatbot_response = requests.post(url="http://setup-rasa-1:5005/webhooks/rest/webhook", json=payload, headers=headers)
+                    if (chatbot_response.status_code == 200 and chatbot_response.json()):
+                        response = chatbot_response.json()[0]['text']
+                    else:
+                        response = "Error from chatbot"
+                except:
+                    response = "Error sending chatbot request. Wait until the rasa server has started"
                 await websocket.send_json({"type": "message", "message": response})
     except WebSocketDisconnect:
         print('User Disconnected')
