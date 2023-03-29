@@ -4,13 +4,14 @@ import pymongo
 import sys
 import certifi
 from location import *
-
+from main import *
 credentials_json = json.load(open("credentials.json"))
+
 client = credentials_json["spotify_client_id"]
 secret = credentials_json["spotify_client_secret"]
 
 
-def weightSongs():
+def weightSongs(userID, token):
 
     dbClient = pymongo.MongoClient(
         "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
@@ -38,27 +39,36 @@ def weightSongs():
         "$gte": (placeValues["energy"]-0.1), "$lte": (placeValues["energy"]+.1)}, "valence": {
         "$gte": (placeValues["valence"]-0.1), "$lte": (placeValues["valence"]+.1)}}
 
-    favSongs = userFav.find(songQuery).limit(60)
-
-    relSongs = userRel.find(songQuery).limit(30)
+    relSongs = list(userRel.find(songQuery).limit(30))
+    favSongs = list(userFav.find(songQuery).limit(75 - len(relSongs)))
+    playIds = []
 
     data = {
         'name': placeType,
-        'description': "Playlist for " + placeType}
+        'description': "Playlsist for " + placeType}
 
-    requests.post(
-        "https://api.spotify.com/v1/users/{user_id}/playlists", data=data)
-    i = 0
+    headers = {"Authorization": "Bearer " + token}
+
+    playlist = requests.post(
+        "https://api.spotify.com/v1/users/"+userID+"/playlists", data=data, headers=headers)
+
+    print(5)
+
     for doc in favSongs:
-        print(doc)
-        i = i+1
 
-    print(i)
-    i = 0
+        playIds.append("spoitfy:track:" + doc["_id"])
+
     for doc in relSongs:
-        print(doc)
-        i = i+1
-    print(i)
+        playIds.append("spoitfy:track: " + doc["_id"])
+
+    uris = {"uris": playIds}
+
+    requestBody = json.dumps(uris)
+
+    playlistID = playlist.json()["id"]
+
+    requests.post("https:/api.spotify.com/v1/playlists/" +
+                  playlistID+"/tracks", data=requestBody, headers=headers)
 
 
 weightSongs()
