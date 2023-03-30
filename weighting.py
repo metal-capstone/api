@@ -25,33 +25,35 @@ def weightSongs():
 
     placeValues = placeCollection.find_one(placeQuery)
 
-    print(placeValues)
+    return placeValues
 
-    userDB = dbClient["UsersSpotifyData"]
+    #print(placeValues)
 
-    userFav = userDB["FavSongs"]
+    #userDB = dbClient["UsersSpotifyData"]
 
-    userRel = userDB["RelatedSongs"]
+    #userFav = userDB["FavSongs"]
 
-    songQuery = {"danceability": {
-        "$gte": (placeValues["danceability"]-0.15), "$lte": (placeValues["danceability"]+.15)}, "energy": {
-        "$gte": (placeValues["energy"]-0.15), "$lte": (placeValues["energy"]+.15)}, "valence": {
-        "$gte": (placeValues["valence"]-0.15), "$lte": (placeValues["valence"]+.15)}}
+    #userRel = userDB["RelatedSongs"]
 
-    favSongs = userFav.find(songQuery).limit(60)
+    #songQuery = {"danceability": {
+        #"$gte": (placeValues["danceability"]-0.15), "$lte": (placeValues["danceability"]+.15)}, "energy": {
+        #"$gte": (placeValues["energy"]-0.15), "$lte": (placeValues["energy"]+.15)}, "valence": {
+        #"$gte": (placeValues["valence"]-0.15), "$lte": (placeValues["valence"]+.15)}}
 
-    relSongs = userRel.find(songQuery).limit(30)
-    i = 0
-    for doc in favSongs:
-        print(doc)
-        i = i+1
+    #favSongs = userFav.find(songQuery).limit(60)
 
-    print(i)
-    i = 0
-    for doc in relSongs:
-        print(doc)
-        i = i+1
-    print(i)
+    #relSongs = userRel.find(songQuery).limit(30)
+    #i = 0
+    #for doc in favSongs:
+        #print(doc)
+        #i = i+1
+
+    #print(i)
+    #i = 0
+    #for doc in relSongs:
+        #print(doc)
+        #i = i+1
+    #print(i)
 
 
 weightSongs()
