@@ -26,4 +26,4 @@ def getRecSong(access_token):
     song_response = requests.get("https://api.spotify.com/v1/recommendations", params=user_params, headers=user_headers)
     song = song_response.json()
     requests.put("https://api.spotify.com/v1/me/player/play", json={"uris": [song['tracks'][0]['uri']]}, headers=user_headers)
-    return { "song": song['tracks'][0]['name'] + " " + song['tracks'][0]['uri']}
+    return {"song": song['tracks'][0]['name']}
