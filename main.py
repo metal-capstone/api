@@ -140,8 +140,10 @@ async def websocket_endpoint(websocket: WebSocket, state: str):
                     chatbot_response = requests.post(url="http://setup-rasa-1:5005/webhooks/rest/webhook", json=payload, headers=headers)
                     if (chatbot_response.status_code == 200 and chatbot_response.json()):
                         response = chatbot_response.json()[0]['text']
+                        if (response == 'Start Music Action'):
+                            response = getRecSong(app.states[state][0])['song']
                     else:
-                        response = "Error from chatbot"
+                        response = "Error" + chatbot_response.status_code
                 except:
                     response = "Error sending chatbot request. Wait until the rasa server has started"
                 await websocket.send_json({"type": "message", "message": response})
