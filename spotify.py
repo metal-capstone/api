@@ -1,19 +1,21 @@
 import requests
 import base64
-from weighting import *
+import weighting
+import json
 
 credentials = json.load(open('credentials.json'))
 
 # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
 scope = 'user-read-private user-read-email user-top-read user-follow-read user-library-read user-read-playback-state user-modify-playback-state'
 
+# Builds auth url from credentials and scope
 def getAuthLink(state):
-    # builds auth url from credentials and scope
     authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + \
         credentials['spotify_client_id'] + '&scope=' + scope + \
         '&redirect_uri=http://localhost:8000/callback&state=' + state
     return authorizeLink
 
+# Header and payload needed for access tokens
 def accessTokenRequestInfo(code):
     encoded_credentials = base64.b64encode(credentials['spotify_client_id'].encode() + b':' + credentials['spotify_client_secret'].encode()).decode('utf-8')
     headers = {
@@ -28,6 +30,7 @@ def accessTokenRequestInfo(code):
     }
     return headers, payload
     
+# User header needed for specific user requests
 def getUserHeader(access_token):
     user_header = {
         'Authorization': 'Bearer ' + access_token,
@@ -35,6 +38,7 @@ def getUserHeader(access_token):
     }
     return user_header
 
+# Users spotify info, returns username and profile picture
 def getUserInfo(access_token):
     user_header = getUserHeader(access_token)
     user_info_response = requests.get('https://api.spotify.com/v1/me', headers=user_header)
@@ -42,7 +46,7 @@ def getUserInfo(access_token):
     return {'type':'user-info', 'username': user_info['display_name'], 'profile_pic': user_info['images'][0]['url'] }
 
 def getRecSong(access_token):
-    placeValues = weightSongsTemp()
+    placeValues = weighting.weightSongsTemp()
     user_header = getUserHeader(access_token)
     user_params = {
         "limit": 1,
