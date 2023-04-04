@@ -6,26 +6,28 @@ import json
 credentials = json.load(open('credentials.json'))
 
 # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
-scope = 'user-read-private user-read-email user-top-read user-follow-read user-library-read user-read-playback-state user-modify-playback-state'
+scope = ' '.join(['user-read-private','user-read-email','user-top-read',
+                  'user-follow-read','user-library-read','user-read-playback-state',
+                  'user-modify-playback-state'])
 
 # Builds auth url from credentials and scope
 def getAuthLink(state):
     authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + \
-        credentials['spotify_client_id'] + '&scope=' + scope + \
-        '&redirect_uri=http://localhost:8000/callback&state=' + state
+                    credentials['spotify_client_id'] + '&scope=' + scope + \
+                    '&redirect_uri=http://localhost:8000/callback&state=' + state
     return authorizeLink
 
 # Header and payload needed for access tokens
 def accessTokenRequestInfo(code):
-    encoded_credentials = base64.b64encode(credentials['spotify_client_id'].encode() + b':' + credentials['spotify_client_secret'].encode()).decode('utf-8')
+    encoded_credentials = base64.b64encode(credentials['spotify_client_id'].encode() + b':' + \
+                                           credentials['spotify_client_secret'].encode()).decode('utf-8')
     headers = {
         'Authorization': 'Basic ' + encoded_credentials,
         'Content-Type': 'application/x-www-form-urlencoded'
     }
-
     payload = {
         'grant_type': 'authorization_code',
-        'code': code,  # use auth code granted from user to get access token
+        'code': code,  # Use auth code granted from user to get access token
         'redirect_uri': 'http://localhost:8000/callback'
     }
     return headers, payload
@@ -45,6 +47,7 @@ def getUserInfo(access_token):
     user_info = user_info_response.json()
     return {'type':'user-info', 'username': user_info['display_name'], 'profile_pic': user_info['images'][0]['url'] }
 
+# Temp function for time box 4
 def getRecSong(access_token):
     placeValues = weighting.weightSongsTemp()
     user_header = getUserHeader(access_token)
