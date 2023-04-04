@@ -53,7 +53,7 @@ def weightSongs():
         i = i+1
     print(i)
 
-def weightSongsTemp(): #temporary weight songs method for timebox 4
+def weightSongsTemp(): #temporary weight songs method for time box 4
 
     dbClient = pymongo.MongoClient(
         "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
@@ -69,6 +69,3 @@ def weightSongsTemp(): #temporary weight songs method for timebox 4
     placeValues = placeCollection.find_one(placeQuery)
 
     return placeValues
-
-
-weightSongs()
