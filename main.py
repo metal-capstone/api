@@ -19,7 +19,9 @@ app = FastAPI()
 
 origins = [
     "http://localhost",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://localhost:5005",
+    "http://localhost:5055"
 ]
 
 app.add_middleware(
@@ -30,16 +32,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class WebsocketRequest(BaseModel):
     websocket: WebSocket
     state: str
+
     class Config:
         arbitrary_types_allowed = True
 
-credentials = json.load(open('credentials.json')) # load in credentials from json file
 
-app.scope = "user-read-private user-read-email user-top-read user-follow-read user-library-read user-read-playback-state user-modify-playback-state" # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
-app.states = {} # dict of tokens for all logged in users, theres definitely a better way to do this but it works for now
+# load in credentials from json file
+credentials = json.load(open('credentials.json'))
+
+# This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
+app.scope = "user-read-private user-read-email user-top-read user-follow-read user-library-read user-read-playback-state user-modify-playback-state"
+app.states = {}  # dict of tokens for all logged in users, theres definitely a better way to do this but it works for now
+
 
 @app.on_event("startup")
 def startup_db_client():
@@ -67,8 +75,10 @@ async def root():
     state = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
     app.states[state] = ['', '']
     # builds auth url from credentials and scope
-    authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + credentials['spotify_client_id'] + '&scope=' + app.scope + '&redirect_uri=http://localhost:8000/callback&state=' + state
-    return { "auth_url": authorizeLink, "state": state }
+    authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + \
+        credentials['spotify_client_id'] + '&scope=' + app.scope + \
+        '&redirect_uri=http://localhost:8000/callback&state=' + state
+    return {"auth_url": authorizeLink, "state": state}
 
 # Endpoint for the callback from the spotify login, updates access token and redirect user to dashboard when successful.
 
@@ -76,10 +86,11 @@ async def root():
 # TODO update so error is redirected to front end with error message, probably by sending an error code
 @app.get("/callback")
 async def root(code: str, state: str, background_tasks: BackgroundTasks):
-    if (state not in app.states): # simple check to see if request is from spotify
+    if (state not in app.states):  # simple check to see if request is from spotify
         return {"message": "state_mismatch"}
     else:
-        encoded_credentials = base64.b64encode(credentials['spotify_client_id'].encode() + b':' + credentials['spotify_client_secret'].encode()).decode("utf-8")
+        encoded_credentials = base64.b64encode(credentials['spotify_client_id'].encode(
+        ) + b':' + credentials['spotify_client_secret'].encode()).decode("utf-8")
         headers = {
             "Authorization": "Basic " + encoded_credentials,
             "Content-Type": "application/x-www-form-urlencoded"
@@ -94,32 +105,50 @@ async def root(code: str, state: str, background_tasks: BackgroundTasks):
         access_token_request = requests.post(
             url="https://accounts.spotify.com/api/token", data=payload, headers=headers)
 
-        if (access_token_request.status_code == 200): #upon token success, store tokens and redirect
+        # upon token success, store tokens and redirect
+        if (access_token_request.status_code == 200):
             app.states[state][0] = access_token_request.json()["access_token"]
             app.states[state][1] = access_token_request.json()["refresh_token"]
 
-            background_tasks.add_task(songCollection, app.states[state][0])
+            #background_tasks.add_task(songCollection, app.states[state][0])
 
             return RedirectResponse("http://localhost:3000/dashboard", status_code=303)
         else:
             return {"message": "invalid_token"}
+
 
 @app.get("/test-mongodb")
 async def test_mongodb():
     response: models.TestData = database.test_mongodb(app.database)
     return response
 
+# This is the main websocket endpoint, the user provides their state and connects to the backend if its found
 @app.websocket("/{state}/ws")
 async def websocket_endpoint(websocket: WebSocket, state: str):
-    await websocket.accept()
-    await websocket.send_json(getUserInfo(app.states[state][0]))
-    await websocket.send_json({"type":"spotify-token", "token":app.states[state][0]})
-    try:
-        while True:
-            data = await websocket.receive_text()
-            if (data.startswith('!state')):
-                await websocket.send_json({"type":"message", "message": f"State: {state}"})
-            else:
-                await websocket.send_json({"type":"message", "message": f"Your message was {data}"})
-    except WebSocketDisconnect:
-        print('User Disconnected')
+    if (state in app.states):
+        await websocket.accept()
+        await websocket.send_json(getUserInfo(app.states[state][0])) #send username and prof pic
+        await websocket.send_json({"type": "spotify-token", "token": app.states[state][0]}) #send token for webplayer
+        try:
+            while True: #loop to wait for user input until disconnection
+                data = await websocket.receive_text() # get message
+                if (data.startswith('!state')): #command check
+                    await websocket.send_json({"type": "message", "message": f"State: {state}"})
+                else:
+                    headers = { 'Content-Type': 'text/plain' }
+                    payload = {'message': data, 'sender': state}
+                    try: # try to request chatbot
+                        chatbot_response = requests.post(url="http://setup-rasa-1:5005/webhooks/rest/webhook", json=payload, headers=headers)
+                        if (chatbot_response.status_code == 200 and chatbot_response.json()): #parse message if request is valid and message is not empty
+                            response = chatbot_response.json()[0]['text']
+                            if (response == 'Start Music Action'): #check if response is an action
+                                response = getRecSong(app.states[state][0])['song']
+                        else:
+                            response = "Error" + chatbot_response.status_code
+                    except:
+                        response = "Error sending chatbot request. Wait until the rasa server has started"
+                    await websocket.send_json({"type": "message", "message": response})
+        except WebSocketDisconnect:
+            print('User Disconnected')
+    else:
+        print('User not found')
