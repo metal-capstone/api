@@ -122,30 +122,33 @@ async def test_mongodb():
     response: models.TestData = database.test_mongodb(app.database)
     return response
 
-
+# This is the main websocket endpoint, the user provides their state and connects to the backend if its found
 @app.websocket("/{state}/ws")
 async def websocket_endpoint(websocket: WebSocket, state: str):
-    await websocket.accept()
-    await websocket.send_json(getUserInfo(app.states[state][0]))
-    await websocket.send_json({"type": "spotify-token", "token": app.states[state][0]})
-    try:
-        while True:
-            data = await websocket.receive_text()
-            if (data.startswith('!state')):
-                await websocket.send_json({"type": "message", "message": f"State: {state}"})
-            else:
-                headers = { 'Content-Type': 'text/plain' }
-                payload = {'message': data, 'sender': state}
-                try:
-                    chatbot_response = requests.post(url="http://setup-rasa-1:5005/webhooks/rest/webhook", json=payload, headers=headers)
-                    if (chatbot_response.status_code == 200 and chatbot_response.json()):
-                        response = chatbot_response.json()[0]['text']
-                        if (response == 'Start Music Action'):
-                            response = getRecSong(app.states[state][0])['song']
-                    else:
-                        response = "Error" + chatbot_response.status_code
-                except:
-                    response = "Error sending chatbot request. Wait until the rasa server has started"
-                await websocket.send_json({"type": "message", "message": response})
-    except WebSocketDisconnect:
-        print('User Disconnected')
+    if (state in app.states):
+        await websocket.accept()
+        await websocket.send_json(getUserInfo(app.states[state][0])) #send username and prof pic
+        await websocket.send_json({"type": "spotify-token", "token": app.states[state][0]}) #send token for webplayer
+        try:
+            while True: #loop to wait for user input until disconnection
+                data = await websocket.receive_text() # get message
+                if (data.startswith('!state')): #command check
+                    await websocket.send_json({"type": "message", "message": f"State: {state}"})
+                else:
+                    headers = { 'Content-Type': 'text/plain' }
+                    payload = {'message': data, 'sender': state}
+                    try: # try to request chatbot
+                        chatbot_response = requests.post(url="http://setup-rasa-1:5005/webhooks/rest/webhook", json=payload, headers=headers)
+                        if (chatbot_response.status_code == 200 and chatbot_response.json()): #parse message if request is valid and message is not empty
+                            response = chatbot_response.json()[0]['text']
+                            if (response == 'Start Music Action'): #check if response is an action
+                                response = getRecSong(app.states[state][0])['song']
+                        else:
+                            response = "Error" + chatbot_response.status_code
+                    except:
+                        response = "Error sending chatbot request. Wait until the rasa server has started"
+                    await websocket.send_json({"type": "message", "message": response})
+        except WebSocketDisconnect:
+            print('User Disconnected')
+    else:
+        print('User not found')

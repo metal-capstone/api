@@ -14,7 +14,7 @@ def getUserInfo(access_token):
     return { "type":"user-info", "username": user_info['display_name'], "profile_pic": user_info['images'][0]['url'] }
 
 def getRecSong(access_token):
-    placeValues = weightSongs()
+    placeValues = weightSongsTemp()
     user_headers = {
         "Authorization": "Bearer " + access_token,
         "Content-Type": "application/json"
@@ -27,8 +27,8 @@ def getRecSong(access_token):
         "min_danceability": placeValues["danceability"]-.05,
         "min_energy": placeValues["energy"]-.05,
         "min_valence": placeValues["valence"]-.05,
-        "max_danceability": placeValues["danceability"]+.05,
-        "max_energy": placeValues["energy"]+.05,
+        "max_danceability": placeValues["danceability"]+.1,
+        "max_energy": placeValues["energy"]+.1,
         "max_valence": placeValues["valence"]+.05,
     }
     song_response = requests.get("https://api.spotify.com/v1/recommendations", params=user_params, headers=user_headers)
