@@ -111,7 +111,7 @@ async def websocket_endpoint(websocket: WebSocket, state: str):
                                 response = spotify.getRecSong(app.states[state][0])['song']
                             
                         else:
-                            response = 'Error' + chatbot_response.status_code
+                            response = f"Error receiving message: {chatbot_response.status_code}"
                     except:
                         response = 'Error sending chatbot request. Wait until the rasa server has started'
 
