@@ -107,9 +107,54 @@ async def websocket_endpoint(websocket: WebSocket, state: str):
                             response = chatbot_response.json()[0]['text']
 
                             # Action handler, perform certain actions based on chatbot response
-                            if (response == 'Start Music Action'):
-                                response = spotify.getRecSong(app.states[state][0])['song']
-                            
+                            match response:
+                                case 'Start Music Action':
+                                    response = spotify.getRecSong(app.states[state][0])['song']
+                                case 'Stop Music Action':
+                                    #add action later
+                                case 'Increase Tempo Action':
+                                    #add action later
+                                case 'Decrease Tempo Action':
+                                    #add action later
+                                case 'Increase Valance Action':
+                                    #add action later
+                                case 'Decrease Valance Action':
+                                    #add action later
+                                case 'Increase Danceability Action':
+                                    #add action later
+                                case 'Decrease Danceability Action':
+                                    #add action later
+                                case 'Increase Liveness Action':
+                                    #add action later
+                                case 'Decrease Liveness Action':
+                                    #add action later
+                                case 'Increase Loudness Action':
+                                    #add action later
+                                case 'Decrease Loudness Action':
+                                    #add action later
+                                case 'Increase Acousticness Action':
+                                    #add action later
+                                case 'Decrease Acousticness Action':
+                                    #add action later
+                                case 'Increase Instrumentalness Action':
+                                    #add action later
+                                case 'Decrease Instrumentalness Action':
+                                    #add action later
+                                case 'Increase Speechiness Action':
+                                    #add action later
+                                case 'Decrease Speechiness Action':
+                                    #add action later
+                                case 'Increase Energy Action':
+                                    #add action later
+                                case 'Decrease Energy Action':
+                                    #add action later
+                                case 'Increase Duration Action':
+                                    #add action later
+                                case 'Decrease Duration Action':
+                                    #add action later
+                                case 'Increase Duration Action':
+                                    #add action later
+
                         else:
                             response = f"Error receiving message: {chatbot_response.status_code}"
                     except:
