@@ -45,7 +45,7 @@ def getUserInfo(access_token):
     user_header = getUserHeader(access_token)
     user_info_response = requests.get('https://api.spotify.com/v1/me', headers=user_header)
     user_info = user_info_response.json()
-    return {'type':'user-info', 'username': user_info['display_name'], 'profile_pic': user_info['images'][0]['url'] }
+    return { 'type': 'user-info', 'username': user_info['display_name'], 'profile_pic': user_info['images'][0]['url'] }
 
 # Temp function for time box 4
 def getRecSong(access_token):

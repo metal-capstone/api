@@ -1,5 +1,5 @@
 from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 
@@ -62,7 +62,7 @@ async def root():
 @app.get('/callback')
 async def root(code: str, state: str, background_tasks: BackgroundTasks):
     if (state not in app.states):  # simple check to see if request is from spotify
-        return {'message': 'state_mismatch'}
+        return RedirectResponse('http://localhost:3000/?error=state_mismatch', status_code=303)
     else:
         headers, payload = spotify.accessTokenRequestInfo(code)
         access_token_request = requests.post(url='https://accounts.spotify.com/api/token', data=payload, headers=headers)
@@ -76,19 +76,33 @@ async def root(code: str, state: str, background_tasks: BackgroundTasks):
 
             return RedirectResponse('http://localhost:3000/dashboard', status_code=303)
         else:
-            return {'message': 'invalid_token'}
+            return RedirectResponse('http://localhost:3000/?error=invalid_token', status_code=303)
 
 @app.get('/test-mongodb')
 async def test_mongodb():
     response: models.TestData = database.test_mongodb(app.database)
     return response
 
+@app.get('/{state}/session-valid')
+async def root(state: str, response: Response):
+    if (state in app.states):
+        return { 'message': 'session-valid' }
+    else:
+        response.status_code = 404
+        return { 'error': 'session not found' }
+    
+@app.post('/{state}/session-logout')
+async def root(state: str):
+    if (state in app.states):
+        app.states.pop(state)
+        return { "message": "Logout Successful"}
+
 # This is the main websocket endpoint, the user provides their state and connects to the backend if its found
 @app.websocket('/{state}/ws')
 async def websocket_endpoint(websocket: WebSocket, state: str):
     if (state in app.states):
         await websocket.accept()
-        await websocket.send_json(spotify.getUserInfo(app.states[state][0])) # Send username and prof pic
+        await websocket.send_json(spotify.getUserInfo(app.states[state][0]))
         await websocket.send_json({'type': 'spotify-token', 'token': app.states[state][0]}) # Send token for web player
         try: # Try until disconnection
             while True: # Main loop to wait for user and then handle it
@@ -120,4 +134,4 @@ async def websocket_endpoint(websocket: WebSocket, state: str):
         except WebSocketDisconnect:
             print('User Disconnected')
     else:
-        print('User not found')
+        print('Session not found')
