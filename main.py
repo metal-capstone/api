@@ -58,7 +58,6 @@ async def root():
     return {'auth_url': authorizeLink, 'state': state}
 
 # Endpoint for the callback from the spotify login, updates access token and redirect user to dashboard when successful.
-# TODO update so error is redirected to front end with error message, probably by sending an error code
 @app.get('/callback')
 async def root(code: str, state: str, background_tasks: BackgroundTasks):
     if (state not in app.states):  # simple check to see if request is from spotify
@@ -83,6 +82,7 @@ async def test_mongodb():
     response: models.TestData = database.test_mongodb(app.database)
     return response
 
+# Simple endpoint to check if a state is valid for a session, 404 if not found
 @app.get('/{state}/session-valid')
 async def root(state: str, response: Response):
     if (state in app.states):
@@ -91,6 +91,7 @@ async def root(state: str, response: Response):
         response.status_code = 404
         return { 'error': 'session not found' }
     
+# Endpoint to end a session, removes state from list of states
 @app.post('/{state}/session-logout')
 async def root(state: str):
     if (state in app.states):
