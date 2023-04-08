@@ -109,7 +109,7 @@ async def websocket_endpoint(websocket: WebSocket, state: str):
         await websocket.send_json(spotify.getUserInfo(app.states[state][0]))
         await websocket.send_json({'type': 'spotify-token', 'token': app.states[state][0]}) # Send token for web player
         try: # Try until disconnection
-            while True: # Main loop to wait for user and then handle it
+            while True: # Main loop to wait for user message and then handle it
                 data = await websocket.receive_text() # Get message
 
                 # Command handler, check if message is a command before sending it to chatbot
