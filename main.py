@@ -63,19 +63,22 @@ async def root(code: str, state: str, background_tasks: BackgroundTasks):
     if (state not in app.states):  # simple check to see if request is from spotify
         return RedirectResponse('http://localhost:3000/?error=state_mismatch', status_code=303)
     else:
-        headers, payload = spotify.accessTokenRequestInfo(code)
-        access_token_request = requests.post(url='https://accounts.spotify.com/api/token', data=payload, headers=headers)
+        try:
+            headers, payload = spotify.accessTokenRequestInfo(code)
+            access_token_request = requests.post(url='https://accounts.spotify.com/api/token', data=payload, headers=headers)
 
-        # upon token success, store tokens and redirect
-        if (access_token_request.status_code == 200):
-            app.states[state][0] = access_token_request.json()['access_token']
-            app.states[state][1] = access_token_request.json()['refresh_token']
+            # upon token success, store tokens and redirect
+            if (access_token_request.status_code == 200):
+                app.states[state][0] = access_token_request.json()['access_token']
+                app.states[state][1] = access_token_request.json()['refresh_token']
 
-            #background_tasks.add_task(songCollection, app.states[state][0])
+                #background_tasks.add_task(songCollection, app.states[state][0])
 
-            return RedirectResponse('http://localhost:3000/dashboard', status_code=303)
-        else:
-            return RedirectResponse('http://localhost:3000/?error=invalid_token', status_code=303)
+                return RedirectResponse('http://localhost:3000/dashboard', status_code=303)
+            else:
+                return RedirectResponse('http://localhost:3000/?error=invalid_token', status_code=303)
+        except requests.exceptions.RequestException:
+            return RedirectResponse('http://localhost:3000/?error=spotify_accounts_error', status_code=303)
 
 @app.get('/test-mongodb')
 async def test_mongodb():
@@ -111,27 +114,26 @@ async def websocket_endpoint(websocket: WebSocket, state: str):
 
                 # Command handler, check if message is a command before sending it to chatbot
                 if (data.startswith('!state')):
-                    await websocket.send_json({'type': 'message', 'message': f"State: {state}"})
+                    response = {'type': 'message', 'message': f"State: {state}"}
                 else: # Not a command, send to chatbot
                     try: # Try to request chatbot, will fail if it is not running
-                        headers = { 'Content-Type': 'text/plain' }
-                        payload = {'message': data, 'sender': state}
+                        headers, payload = {'Content-Type': 'text/plain'}, {'message': data, 'sender': state}
                         chatbot_response = requests.post(url='http://setup-rasa-1:5005/webhooks/rest/webhook', json=payload, headers=headers)
 
                         if (chatbot_response.status_code == 200 and chatbot_response.json()): # Parse message if request is valid and message is not empty
-                            response = chatbot_response.json()[0]['text']
+                            response = {'type': 'message', 'message': chatbot_response.json()[0]['text']}
 
                             # Action handler, perform certain actions based on chatbot response
                             if (response == 'Start Music Action'):
                                 response = spotify.getRecSong(app.states[state][0])['song']
                             
                         else:
-                            response = f"Error receiving message: {chatbot_response.status_code}"
-                    except:
-                        response = 'Error sending chatbot request. Wait until the rasa server has started'
-
-                    # Send the user the final response
-                    await websocket.send_json({'type': 'message', 'message': response})
+                            response = {'type': 'error', 'error': f"Error receiving message: {chatbot_response.status_code}"}
+                    except requests.exceptions.RequestException as error:
+                        response = {'type': 'error', 'error': f"Error sending chatbot request. ({error})"}
+                        
+                # Send the user the final response
+                await websocket.send_json(response)
         except WebSocketDisconnect:
             print('User Disconnected')
     else:
