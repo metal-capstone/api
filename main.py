@@ -58,10 +58,15 @@ async def root():
     return {'auth_url': authorizeLink, 'state': state}
 
 # Endpoint for the callback from the spotify login, updates access token and redirect user to dashboard when successful.
+# code is the key to get users auth tokens, if it fails you get error instead. If it fails remove state from states
 @app.get('/callback')
-async def root(code: str, state: str, background_tasks: BackgroundTasks):
+async def root(state: str, background_tasks: BackgroundTasks, code: str | None = None, error: str | None = None):
     if (state not in app.states):  # simple check to see if request is from spotify
+        app.states.pop(state)
         return RedirectResponse('http://localhost:3000/?error=state_mismatch', status_code=303)
+    elif (error is not None): # Check if theres an error from spotify
+        app.states.pop(state)
+        return RedirectResponse(f"http://localhost:3000/?error=spotify_{error}", status_code=303)
     else:
         try:
             headers, payload = spotify.accessTokenRequestInfo(code)
@@ -76,8 +81,10 @@ async def root(code: str, state: str, background_tasks: BackgroundTasks):
 
                 return RedirectResponse('http://localhost:3000/dashboard', status_code=303)
             else:
+                app.states.pop(state)
                 return RedirectResponse('http://localhost:3000/?error=invalid_token', status_code=303)
         except requests.exceptions.RequestException:
+            app.states.pop(state)
             return RedirectResponse('http://localhost:3000/?error=spotify_accounts_error', status_code=303)
 
 @app.get('/test-mongodb')
