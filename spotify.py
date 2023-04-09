@@ -40,7 +40,29 @@ def getUserHeader(access_token):
     }
     return user_header
 
-# Users spotify info, returns username and profile picture if it exists
+def getAccessToken(refresh_token):
+    header, unused_payload = accessTokenRequestInfo('')
+    payload = {
+        'grant_type': 'refresh_token',
+        'refresh_token': refresh_token
+    }
+    access_token_response = requests.post('https://accounts.spotify.com/api/token', data=payload, headers=header)
+    if (access_token_response.status_code == 200):
+        return access_token_response.json()['access_token']
+    else:
+        raise Exception(f"Error getting new token (Status Code: {access_token_response.status_code})")
+
+# gets users spotify info for a new session, returns uri and username. Sent to start session in util
+def getSessionUserInfo(access_token):
+    user_header = getUserHeader(access_token)
+    user_info_response = requests.get('https://api.spotify.com/v1/me', headers=user_header)
+    if (user_info_response.status_code == 200):
+        user_info = user_info_response.json()
+        return user_info['uri'], user_info['display_name']
+    else:
+        raise Exception(f"Error getting user info (Status Code: {user_info_response.status_code})")
+
+# Users spotify info, returns username and profile picture if it exists. Sent to user via websocket
 def getUserInfo(access_token):
     user_header = getUserHeader(access_token)
     try:
@@ -75,4 +97,4 @@ def getRecSong(access_token):
     song_response = requests.get("https://api.spotify.com/v1/recommendations", params=user_params, headers=user_header)
     song = song_response.json()
     requests.put("https://api.spotify.com/v1/me/player/play", json={"uris": [song['tracks'][0]['uri']]}, headers=user_header)
-    return {"song": song['tracks'][0]['name']}
+    return {"type": "message", "message": song['tracks'][0]['name']}
