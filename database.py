@@ -32,11 +32,14 @@ def user_exists(id):
     num_users = USER_DATA_CLUSTER['Users'].count_documents({'_id': id}, limit = 1)
     return num_users != 0
 
+def clear_user(id):
+    USER_DATA_CLUSTER['Users'].delete_one({'_id': id})
+
 def valid_session(session_id):
     num_users = USER_DATA_CLUSTER['Users'].count_documents({'session_id': session_id}, limit = 1)
     return num_users != 0
     
-def get_resume_session_data(session_id):
+def get_session_data(session_id):
     user = USER_DATA_CLUSTER['Users'].find_one({'session_id': session_id})
     return user['refresh_token'], user['_id']
 

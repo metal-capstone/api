@@ -40,6 +40,7 @@ def getUserHeader(access_token):
     }
     return user_header
 
+# function to get a new access token from spotify, either returns new token or raises exception
 def getAccessToken(refresh_token):
     header, unused_payload = accessTokenRequestInfo('')
     payload = {
