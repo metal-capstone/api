@@ -40,12 +40,21 @@ def getUserHeader(access_token):
     }
     return user_header
 
-# Users spotify info, returns username and profile picture
+# Users spotify info, returns username and profile picture if it exists
 def getUserInfo(access_token):
     user_header = getUserHeader(access_token)
-    user_info_response = requests.get('https://api.spotify.com/v1/me', headers=user_header)
-    user_info = user_info_response.json()
-    return {'type':'user-info', 'username': user_info['display_name'], 'profile_pic': user_info['images'][0]['url'] }
+    try:
+        user_info_response = requests.get('https://api.spotify.com/v1/me', headers=user_header)
+        if (user_info_response.status_code == 200):
+            user_info = user_info_response.json()
+            if ('images' in user_info and user_info['images']): # checks if user has a profile picture
+                return {'type': 'user-info', 'username': user_info['display_name'], 'profile_pic': user_info['images'][0]['url']}
+            else:
+                return {'type': 'user-info', 'username': user_info['display_name']}
+        else:
+            return {'type': 'error', 'error': f"(getUserInfo) Error getting spotify user info. (Status Code:{user_info_response.status_code})"}
+    except requests.exceptions.RequestException as error:
+        return {'type': 'error', 'error': f"(getUserInfo) Error getting response from spotify. ({error})"}
 
 # Temp function for time box 4
 def getRecSong(access_token):

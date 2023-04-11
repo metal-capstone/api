@@ -1,5 +1,5 @@
 from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 
@@ -58,66 +58,90 @@ async def root():
     return {'auth_url': authorizeLink, 'state': state}
 
 # Endpoint for the callback from the spotify login, updates access token and redirect user to dashboard when successful.
-# TODO update so error is redirected to front end with error message, probably by sending an error code
+# code is the key to get users auth tokens, if it fails you get error instead. If it fails remove state from states
 @app.get('/callback')
-async def root(code: str, state: str, background_tasks: BackgroundTasks):
+async def root(state: str, background_tasks: BackgroundTasks, code: str | None = None, error: str | None = None):
     if (state not in app.states):  # simple check to see if request is from spotify
-        return {'message': 'state_mismatch'}
+        app.states.pop(state)
+        return RedirectResponse('http://localhost:3000/?error=state_mismatch', status_code=303)
+    elif (error is not None): # Check if theres an error from spotify
+        app.states.pop(state)
+        return RedirectResponse(f"http://localhost:3000/?error=spotify_{error}", status_code=303)
     else:
-        headers, payload = spotify.accessTokenRequestInfo(code)
-        access_token_request = requests.post(url='https://accounts.spotify.com/api/token', data=payload, headers=headers)
+        try:
+            headers, payload = spotify.accessTokenRequestInfo(code)
+            access_token_request = requests.post(url='https://accounts.spotify.com/api/token', data=payload, headers=headers)
 
-        # upon token success, store tokens and redirect
-        if (access_token_request.status_code == 200):
-            app.states[state][0] = access_token_request.json()['access_token']
-            app.states[state][1] = access_token_request.json()['refresh_token']
+            # upon token success, store tokens and redirect
+            if (access_token_request.status_code == 200):
+                app.states[state][0] = access_token_request.json()['access_token']
+                app.states[state][1] = access_token_request.json()['refresh_token']
 
-            #background_tasks.add_task(songCollection, app.states[state][0])
+                #background_tasks.add_task(songCollection, app.states[state][0])
 
-            return RedirectResponse('http://localhost:3000/dashboard', status_code=303)
-        else:
-            return {'message': 'invalid_token'}
+                return RedirectResponse('http://localhost:3000/dashboard', status_code=303)
+            else:
+                app.states.pop(state)
+                return RedirectResponse('http://localhost:3000/?error=invalid_token', status_code=303)
+        except requests.exceptions.RequestException:
+            app.states.pop(state)
+            return RedirectResponse('http://localhost:3000/?error=spotify_accounts_error', status_code=303)
 
 @app.get('/test-mongodb')
 async def test_mongodb():
     response: models.TestData = database.test_mongodb(app.database)
     return response
 
+# Simple endpoint to check if a state is valid for a session, 404 if not found
+@app.get('/{state}/session-valid')
+async def root(state: str, response: Response):
+    if (state in app.states):
+        return { 'message': 'session-valid' }
+    else:
+        response.status_code = 404
+        return { 'error': 'session not found' }
+    
+# Endpoint to end a session, removes state from list of states
+@app.post('/{state}/session-logout')
+async def root(state: str):
+    if (state in app.states):
+        app.states.pop(state)
+        return { "message": "Logout Successful"}
+
 # This is the main websocket endpoint, the user provides their state and connects to the backend if its found
 @app.websocket('/{state}/ws')
 async def websocket_endpoint(websocket: WebSocket, state: str):
     if (state in app.states):
         await websocket.accept()
-        await websocket.send_json(spotify.getUserInfo(app.states[state][0])) # Send username and prof pic
+        await websocket.send_json(spotify.getUserInfo(app.states[state][0]))
         await websocket.send_json({'type': 'spotify-token', 'token': app.states[state][0]}) # Send token for web player
         try: # Try until disconnection
-            while True: # Main loop to wait for user and then handle it
+            while True: # Main loop to wait for user message and then handle it
                 data = await websocket.receive_text() # Get message
 
                 # Command handler, check if message is a command before sending it to chatbot
                 if (data.startswith('!state')):
-                    await websocket.send_json({'type': 'message', 'message': f"State: {state}"})
+                    response = {'type': 'message', 'message': f"State: {state}"}
                 else: # Not a command, send to chatbot
                     try: # Try to request chatbot, will fail if it is not running
-                        headers = { 'Content-Type': 'text/plain' }
-                        payload = {'message': data, 'sender': state}
+                        headers, payload = {'Content-Type': 'text/plain'}, {'message': data, 'sender': state}
                         chatbot_response = requests.post(url='http://setup-rasa-1:5005/webhooks/rest/webhook', json=payload, headers=headers)
 
                         if (chatbot_response.status_code == 200 and chatbot_response.json()): # Parse message if request is valid and message is not empty
-                            response = chatbot_response.json()[0]['text']
+                            response = {'type': 'message', 'message': chatbot_response.json()[0]['text']}
 
                             # Action handler, perform certain actions based on chatbot response
                             if (response == 'Start Music Action'):
                                 response = spotify.getRecSong(app.states[state][0])['song']
                             
                         else:
-                            response = f"Error receiving message: {chatbot_response.status_code}"
-                    except:
-                        response = 'Error sending chatbot request. Wait until the rasa server has started'
-
-                    # Send the user the final response
-                    await websocket.send_json({'type': 'message', 'message': response})
+                            response = {'type': 'error', 'error': f"Error receiving message: {chatbot_response.status_code}"}
+                    except requests.exceptions.RequestException as error:
+                        response = {'type': 'error', 'error': f"Error sending chatbot request. ({error})"}
+                        
+                # Send the user the final response
+                await websocket.send_json(response)
         except WebSocketDisconnect:
             print('User Disconnected')
     else:
-        print('User not found')
+        print('Session not found')
