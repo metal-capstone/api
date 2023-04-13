@@ -30,6 +30,7 @@ def weightSongs(userID, token):
     userFav = userDB["FavSongs"]
 
     userRel = userDB["RelatedSongs"]
+    lim = 75
 
     songQuery = {"danceability": {
         "$gte": (placeValues["danceability"]-0.1), "$lte": (placeValues["danceability"]+.1)}, "energy": {
@@ -39,6 +40,29 @@ def weightSongs(userID, token):
     relSongs = list(userRel.find(songQuery).limit(30))
 
     favSongs = list(userFav.find(songQuery).limit(75-len(relSongs)))
+    lim = 75 - len(relSongs) - len(favSongs)
+    print(lim)
+
+    user_params = {
+        "limit": lim,
+        "seed_artists": "",
+        "seed_tracks": "",
+        "seed_genres": "",
+        "min_danceability": placeValues["danceability"]-.1,
+        "min_energy": placeValues["energy"]-.1,
+        "min_valence": placeValues["valence"]-.1,
+        "max_danceability": placeValues["danceability"]+.1,
+        "max_energy": placeValues["energy"]+.1,
+        "max_valence": placeValues["valence"]+.1,
+    }
+
+    headers = {"Authorization": "Bearer " +
+               token, "Content-Type": "application/json"}
+    reqSongs = {}
+    if (lim > 0):
+        reqSongs = requests.get(
+            "https://api.spotify.com/v1/recommendations", params=user_params, headers=headers).json()
+    reqList = list(reqSongs['tracks'])
 
     data = {
         'name': placeType,
@@ -47,12 +71,8 @@ def weightSongs(userID, token):
 
     }
 
-    headers = {"Authorization": "Bearer " +
-               token, "Content-Type": "application/json"}
-
     playlist = requests.post(
         "https://api.spotify.com/v1/users/"+userID+"/playlists", data=json.dumps(data), headers=headers).json()
-    print(playlist)
 
     playIds = []
     for doc in favSongs:
@@ -61,13 +81,14 @@ def weightSongs(userID, token):
     for doc in relSongs:
         playIds.append("spotify:track:" + str(doc['_id']))
 
+    for doc in reqList:
+        playIds.append("spotify:track:" + str(doc['id']))
+
     uris = {"uris": playIds, "position": 0}
 
     playlistID = playlist['id']
-    print(playlistID)
 
     playlistURI = playlist['uri']
-    print(playlistURI)
 
     requests.post("https://api.spotify.com/v1/playlists/" +
                   playlistID + "/tracks", data=json.dumps(uris), headers=headers)
