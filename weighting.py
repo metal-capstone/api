@@ -66,10 +66,19 @@ def weightSongs(userID, token):
     playlistID = playlist['id']
     print(playlistID)
 
-    print(json.dumps(uris))
+    playlistURI = playlist['uri']
+    print(playlistURI)
 
-    print(requests.post("https://api.spotify.com/v1/playlists/" +
-                        playlistID + "/tracks", data=json.dumps(uris), headers=headers))
+    requests.post("https://api.spotify.com/v1/playlists/" +
+                  playlistID + "/tracks", data=json.dumps(uris), headers=headers)
+
+    uriJson = {"context_uri": playlistURI}
+
+    headers = {"Authorization": "Bearer " +
+               token, "Content-Type": "application/json"}
+
+    requests.put("https://api.spotify.com/v1/me/player/play",
+                 data=json.dumps(uriJson), headers=headers)
     return {'txt': str("Playlist Created for " + placeType.capitalize())}
 
 
