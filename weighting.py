@@ -10,7 +10,7 @@ client = credentials_json["spotify_client_id"]
 secret = credentials_json["spotify_client_secret"]
 
 
-def weightSongs():
+def weightSongs(userID, token):
 
     dbClient = pymongo.MongoClient(
         "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
@@ -25,8 +25,6 @@ def weightSongs():
 
     placeValues = placeCollection.find_one(placeQuery)
 
-    print(placeValues)
-
     userDB = dbClient["UsersSpotifyData"]
 
     userFav = userDB["FavSongs"]
@@ -34,26 +32,48 @@ def weightSongs():
     userRel = userDB["RelatedSongs"]
 
     songQuery = {"danceability": {
-        "$gte": (placeValues["danceability"]-0.15), "$lte": (placeValues["danceability"]+.15)}, "energy": {
-        "$gte": (placeValues["energy"]-0.15), "$lte": (placeValues["energy"]+.15)}, "valence": {
-        "$gte": (placeValues["valence"]-0.15), "$lte": (placeValues["valence"]+.15)}}
+        "$gte": (placeValues["danceability"]-0.1), "$lte": (placeValues["danceability"]+.1)}, "energy": {
+        "$gte": (placeValues["energy"]-0.1), "$lte": (placeValues["energy"]+.1)}, "valence": {
+        "$gte": (placeValues["valence"]-0.1), "$lte": (placeValues["valence"]+.1)}}
 
-    favSongs = userFav.find(songQuery).limit(60)
+    relSongs = list(userRel.find(songQuery).limit(30))
 
-    relSongs = userRel.find(songQuery).limit(30)
-    i = 0
+    favSongs = list(userFav.find(songQuery).limit(75-len(relSongs)))
+
+    data = {
+        'name': placeType,
+        'description': "Playlist for " + placeType.capitalize(),
+        'public': True
+
+    }
+
+    headers = {"Authorization": "Bearer " +
+               token, "Content-Type": "application/json"}
+
+    playlist = requests.post(
+        "https://api.spotify.com/v1/users/"+userID+"/playlists", data=json.dumps(data), headers=headers).json()
+    print(playlist)
+
+    playIds = []
     for doc in favSongs:
-        print(doc)
-        i = i+1
+        playIds.append("spotify:track:" + str(doc['_id']))
 
-    print(i)
-    i = 0
     for doc in relSongs:
-        print(doc)
-        i = i+1
-    print(i)
+        playIds.append("spotify:track:" + str(doc['_id']))
 
-def weightSongsTemp(): #temporary weight songs method for time box 4
+    uris = {"uris": playIds, "position": 0}
+
+    playlistID = playlist['id']
+    print(playlistID)
+
+    print(json.dumps(uris))
+
+    print(requests.post("https://api.spotify.com/v1/playlists/" +
+                        playlistID + "/tracks", data=json.dumps(uris), headers=headers))
+    return {'txt': str("Playlist Created for " + placeType.capitalize())}
+
+
+def weightSongsTemp():  # temporary weight songs method for time box 4
 
     dbClient = pymongo.MongoClient(
         "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
