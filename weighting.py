@@ -47,22 +47,26 @@ def weightSongs(userID, token):
         "limit": lim,
         "seed_artists": "",
         "seed_tracks": "",
-        "seed_genres": "",
-        "min_danceability": placeValues["danceability"]-.1,
-        "min_energy": placeValues["energy"]-.1,
-        "min_valence": placeValues["valence"]-.1,
-        "max_danceability": placeValues["danceability"]+.1,
-        "max_energy": placeValues["energy"]+.1,
-        "max_valence": placeValues["valence"]+.1,
+        "seed_genres": "hip-hop,pop,house,chill,alternative",
+        "min_danceability": placeValues["danceability"]-.2,
+        "target_danceability": placeValues["danceability"],
+        "min_energy": placeValues["energy"]-.2,
+        "target_energy": placeValues["energy"],
+        "min_valence": placeValues["valence"]-.2,
+        "max_danceability": placeValues["danceability"]+.2,
+        "max_energy": placeValues["energy"]+.2,
+        "max_valence": placeValues["valence"]+.2,
+        "target_valence": placeValues["valence"],
     }
 
     headers = {"Authorization": "Bearer " +
                token, "Content-Type": "application/json"}
     reqSongs = {}
+    reqList = []
     if (lim > 0):
         reqSongs = requests.get(
             "https://api.spotify.com/v1/recommendations", params=user_params, headers=headers).json()
-    reqList = list(reqSongs['tracks'])
+        reqList = list(reqSongs['tracks'])
 
     data = {
         'name': placeType,

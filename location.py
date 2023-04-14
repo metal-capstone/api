@@ -24,13 +24,13 @@ def getPlace():
     # placeID = addressData["results"][0]["place_id"]
 
     # Hardcoded Out-R-Inn Place ID
-    #placeID = "ChIJRX1tQ7uOOIgRO9wNKF-naaE"
+    placeID = "ChIJRX1tQ7uOOIgRO9wNKF-naaE"
 
     # Hardcoded Ohio Stadium Place ID
     #placeID = "ChIJVX_yAZSOOIgRpZhJFs2DSUs"
 
     # Hardcoded Thompson Library Place ID
-    placeID = "ChIJP74-z5eOOIgRBVNFuzx7O7U"
+    #placeID = "ChIJP74-z5eOOIgRBVNFuzx7O7U"
 
     # Get place type from user's place type
     placeDetails = requests.get(
