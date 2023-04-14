@@ -1,4 +1,4 @@
-import requests
+import httpx
 import base64
 import weighting
 import json
@@ -47,7 +47,7 @@ def getAccessToken(refresh_token):
         'grant_type': 'refresh_token',
         'refresh_token': refresh_token
     }
-    access_token_response = requests.post('https://accounts.spotify.com/api/token', data=payload, headers=header)
+    access_token_response = httpx.post('https://accounts.spotify.com/api/token', data=payload, headers=header)
     if (access_token_response.status_code == 200):
         return access_token_response.json()['access_token']
     else:
@@ -56,7 +56,7 @@ def getAccessToken(refresh_token):
 # gets users spotify info for a new session, returns uri and username. Sent to start session in util
 def getSessionUserInfo(access_token):
     user_header = getUserHeader(access_token)
-    user_info_response = requests.get('https://api.spotify.com/v1/me', headers=user_header)
+    user_info_response = httpx.get('https://api.spotify.com/v1/me', headers=user_header)
     if (user_info_response.status_code == 200):
         user_info = user_info_response.json()
         return user_info['uri'], user_info['display_name']
@@ -67,7 +67,7 @@ def getSessionUserInfo(access_token):
 def getUserInfo(access_token):
     user_header = getUserHeader(access_token)
     try:
-        user_info_response = requests.get('https://api.spotify.com/v1/me', headers=user_header)
+        user_info_response = httpx.get('https://api.spotify.com/v1/me', headers=user_header)
         if (user_info_response.status_code == 200):
             user_info = user_info_response.json()
             if ('images' in user_info and user_info['images']): # checks if user has a profile picture
@@ -76,8 +76,48 @@ def getUserInfo(access_token):
                 return {'type': 'user-info', 'username': user_info['display_name']}
         else:
             return {'type': 'error', 'error': f"(getUserInfo) Error getting spotify user info. (Status Code:{user_info_response.status_code})"}
-    except requests.exceptions.RequestException as error:
+    except httpx.RequestError as error:
         return {'type': 'error', 'error': f"(getUserInfo) Error getting response from spotify. ({error})"}
+    
+async def getUserTopItemsAsync(access_token, type, time_range, limit, offset):
+    user_header = getUserHeader(access_token)
+    params = {
+        'time_range': time_range,
+        'limit': limit,
+        'offset': offset
+    }
+    async with httpx.AsyncClient() as client:
+        top_items_response = await client.get(f"https://api.spotify.com/v1/me/top/{type}", params=params, headers=user_header)
+        if (top_items_response.status_code == 200):
+            top_items = top_items_response.json()
+            return [ item['uri'] for item in top_items['items'] ]
+        else:
+            print(f"Error getting top items ({top_items_response.status_code})")
+
+def recommendSongs(access_token, params):
+    user_header = getUserHeader(access_token)
+    try:
+        songs_response = httpx.get("https://api.spotify.com/v1/recommendations", params=params, headers=user_header)
+        if (songs_response.status_code == 200):
+            songs = songs_response.json()
+            response = {}
+            for song in songs['tracks']:
+                response[song['uri']] = song['name']
+            return response
+        else:
+            print(f"Error getting recommended songs ({songs_response.status_code})")
+    except Exception as e:
+        print(e)
+
+def playSong(access_token, ids):
+    user_header = getUserHeader(access_token)
+    try:
+        play_response = httpx.put("https://api.spotify.com/v1/me/player/play", json={"uris": ids}, headers=user_header)
+        if (play_response.status_code != 204):
+            print(f"Error playing songs ({play_response.status_code})")
+    except Exception as e:
+        print(e)
+
 
 # Temp function for time box 4
 def getRecSong(access_token):
@@ -95,7 +135,7 @@ def getRecSong(access_token):
         "max_energy": placeValues["energy"]+.1,
         "max_valence": placeValues["valence"]+.05,
     }
-    song_response = requests.get("https://api.spotify.com/v1/recommendations", params=user_params, headers=user_header)
+    song_response = httpx.get("https://api.spotify.com/v1/recommendations", params=user_params, headers=user_header)
     song = song_response.json()
-    requests.put("https://api.spotify.com/v1/me/player/play", json={"uris": [song['tracks'][0]['uri']]}, headers=user_header)
+    httpx.put("https://api.spotify.com/v1/me/player/play", json={"uris": [song['tracks'][0]['uri']]}, headers=user_header)
     return {"type": "message", "message": song['tracks'][0]['name']}

@@ -2,7 +2,7 @@ from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-import requests
+import httpx
 import secrets
 
 import database
@@ -20,7 +20,8 @@ origins = [
     'http://localhost',
     'http://localhost:3000',
     'http://localhost:5005',
-    'http://localhost:5055'
+    'http://localhost:5055',
+    'http://localhost:443'
 ]
 
 app.add_middleware(
@@ -31,10 +32,14 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
-app.states = set()  # set for all active states, stored only temporarily until spotify callback
-app.sessions: sessions.SessionManager = sessions.SessionManager()  # object for all active sessions, stores session info
+# app.add_middleware(
+#     util.DelayMiddleware,
+#     delayMin=3,
+#     delayRange=2
+# )
 
-#app.add_middleware(util.ASGIMiddleware, sessions=app.sessions)
+app.states = set()  # set for all active states, stored only temporarily until spotify callback
+app.sessions = sessions.SessionManager()  # object for all active sessions, stores session info
 
 @app.on_event('startup')
 def startup_db_client():
@@ -42,7 +47,10 @@ def startup_db_client():
 
 @app.on_event('shutdown')
 def shutdown_db_client():
-    database.close_client()
+    try:
+        database.close_client()
+    except Exception as e:
+        print(e)
 
 @app.get('/')
 async def root():
@@ -51,7 +59,7 @@ async def root():
 # Endpoint that generates the authorization url and state, redirects the user
 @app.get('/spotify-login', response_class=RedirectResponse)
 async def root() -> RedirectResponse:
-    # random state to check if callback request is legitimate, and for identifying user in future callbacks
+    # random state to check if callback request is legitimate upon return
     state = secrets.token_urlsafe(16)
     app.states.add(state)
     authorizeLink = spotify.getAuthLink(state)
@@ -69,7 +77,7 @@ async def root(state: str, background_tasks: BackgroundTasks, code: str | None =
         try:
             # get tokens from spotify
             headers, payload = spotify.accessTokenRequestInfo(code)
-            access_token_request = requests.post(url='https://accounts.spotify.com/api/token', data=payload, headers=headers)
+            access_token_request = httpx.post(url='https://accounts.spotify.com/api/token', data=payload, headers=headers)
 
             # upon token success, start session and store tokens
             if (access_token_request.status_code == 200):
@@ -86,7 +94,7 @@ async def root(state: str, background_tasks: BackgroundTasks, code: str | None =
             else:
                 # redirect users to error links for errors
                 response = RedirectResponse('http://localhost:3000/?error=invalid_token', status_code=303)
-        except requests.exceptions.RequestException:
+        except httpx.RequestError:
             response = RedirectResponse('http://localhost:3000/?error=spotify_accounts_error', status_code=303)
     
     # remove state and return final response
@@ -113,8 +121,9 @@ async def websocket_endpoint(websocket: WebSocket):
             # wait for users message until session is invalid
             while app.sessions.validSession(session_id):
                 data = await websocket.receive_json() # Get message
-
+                # handle message commands and actions, get optional response
                 response = sessions.handleMessage(data, session_id, app.sessions)
+                # send if not empty
                 if (response):
                     await websocket.send_json(response)
                 
@@ -122,6 +131,8 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json({'type': 'log-status', 'loggedIn': False})
             await websocket.send_json({'type': 'message', 'message': 'Logged Out'})
         except WebSocketDisconnect: # user disconnect
+            app.sessions.disconnectSession(session_id)
+        except Exception: # handle all other errors
             app.sessions.disconnectSession(session_id)
     else:
         # session not valid, confirm the user status and deny connection

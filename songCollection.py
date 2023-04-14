@@ -1,4 +1,4 @@
-import requests
+import httpx
 import json
 
 def getUsersArtists(user_headers):
@@ -13,7 +13,7 @@ def getUsersArtists(user_headers):
             "limit": 10,
             "time_range": t
         }
-        json_response = requests.get("https://api.spotify.com/v1/me/top/artists", params=user_params, headers=user_headers).json()
+        json_response = httpx.get("https://api.spotify.com/v1/me/top/artists", params=user_params, headers=user_headers).json()
         top_artists_data = json_response['items']
         for data in top_artists_data:
             uri = data['uri'][prefixLength:]
@@ -26,7 +26,7 @@ def getUsersArtists(user_headers):
         "type": 'artist',
         "limit": 30
     }
-    json_response = requests.get("https://api.spotify.com/v1/me/following", params=user_params, headers=user_headers).json()
+    json_response = httpx.get("https://api.spotify.com/v1/me/following", params=user_params, headers=user_headers).json()
     
     top_artists_data = json_response['artists']['items']
     for data in top_artists_data:
@@ -42,7 +42,7 @@ def getUsersArtists(user_headers):
         user_params = {
             "id": uri
         }
-        json_response = requests.get("https://api.spotify.com/v1/artists/"+uri+"/related-artists", params=user_params, headers=user_headers).json()
+        json_response = httpx.get("https://api.spotify.com/v1/artists/"+uri+"/related-artists", params=user_params, headers=user_headers).json()
 
         count = 0
         top_related_artists_data = json_response['artists']
@@ -66,7 +66,7 @@ def getUsersSongs(user_headers, users_top_artists, users_top_related_artists):
     prefixLength = len('spotify:track:')
 
     #Get all the songs the user saved
-    json_response = requests.get("https://api.spotify.com/v1/me/tracks", headers=user_headers).json()
+    json_response = httpx.get("https://api.spotify.com/v1/me/tracks", headers=user_headers).json()
     total = json_response['total']
     limit = 50
     offset = 0
@@ -76,7 +76,7 @@ def getUsersSongs(user_headers, users_top_artists, users_top_related_artists):
             "limit": limit,
             "offset": offset
         }
-        json_response = requests.get("https://api.spotify.com/v1/me/tracks", params=user_params, headers=user_headers).json()
+        json_response = httpx.get("https://api.spotify.com/v1/me/tracks", params=user_params, headers=user_headers).json()
         
         saved_songs_data = json_response['items']
         for data in saved_songs_data:
@@ -93,7 +93,7 @@ def getUsersSongs(user_headers, users_top_artists, users_top_related_artists):
             "id": id,
             "market": "US"
         }
-        json_response = requests.get("https://api.spotify.com/v1/artists/"+id+"/top-tracks", params=user_params, headers=user_headers).json()
+        json_response = httpx.get("https://api.spotify.com/v1/artists/"+id+"/top-tracks", params=user_params, headers=user_headers).json()
         top_songs_artists_data = json_response['tracks']
         count = 0
 
@@ -113,7 +113,7 @@ def getUsersSongs(user_headers, users_top_artists, users_top_related_artists):
             "id": id,
             "market": "US"
         }
-        json_response = requests.get("https://api.spotify.com/v1/artists/"+id+"/top-tracks", params=user_params, headers=user_headers).json()
+        json_response = httpx.get("https://api.spotify.com/v1/artists/"+id+"/top-tracks", params=user_params, headers=user_headers).json()
         
         top_songs_related_artists_data = json_response['tracks']
         count = 0
@@ -144,7 +144,7 @@ def getAudioFeatures(user_headers, users_related_artists_top_songs):
         user_params = {
             "ids": songs_str
             }
-        json_response = requests.get("https://api.spotify.com/v1/audio-features", params=user_params, headers=user_headers).json()
+        json_response = httpx.get("https://api.spotify.com/v1/audio-features", params=user_params, headers=user_headers).json()
         audio_features_data = json_response['audio_features']
         
         for data in audio_features_data:

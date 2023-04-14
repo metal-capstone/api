@@ -1,21 +1,22 @@
-from fastapi.responses import JSONResponse
-import sessions
-import database
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import Receive, Scope, Send
+import random
+import asyncio
 
-# https://stackoverflow.com/a/73659723
-class ASGIMiddleware:
-    def __init__(self, app, sessions: sessions.SessionManager):
+# dev middleware that adds a delay before returning requests
+class DelayMiddleware:
+    # delays are in seconds
+    def __init__(self, app, delayMin: int = 0, delayRange: int = 0):
         self.app = app
-        self.sessions = sessions
+        self.delayMin = delayMin
+        self.delayRange = delayRange
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if (scope['type'] == 'websocket'):
-            cookies = scope['headers'][10][1].decode('ascii').split('; ')
-            session = [not cookie.startswith('session_id') or cookie for cookie in cookies]
-            if (session[0]):
-                session_id = session[1].split('=')[1]
-                if (self.sessions.validSession(session_id) or database.valid_session(session_id)):
-                    return await self.app(scope, receive, send)
-                return JSONResponse(content={"message": "session not found"}, status_code=404)
-        return await self.app(scope, receive, send)
+        response = await self.app(scope, receive, send)
+        await asyncDelay(self.delayMin, self.delayRange)
+        return response
+    
+# total delay is the min plus a random range, delays are in seconds. Returns total delay
+async def asyncDelay(delayMin: int, delayRange: int = 0):
+    totalDelay = delayMin + (random.random() * delayRange)
+    await asyncio.sleep(totalDelay)
+    return totalDelay
