@@ -4,6 +4,7 @@ import database
 import httpx
 import asyncio
 import random
+import weighting
 
 # Object that manages sessions, stores auth, id, and connection data, creates and updates the user in the db
 class SessionManager:
@@ -140,6 +141,10 @@ def handleAction(text: str, session_id: str, sessions: SessionManager):
             songs = recommendSongs(sessions.getUserID(session_id), sessions.getAccessToken(session_id), 1)
             spotify.playSong(sessions.getAccessToken(session_id), list(songs.keys()))
             response = {'type': 'message', 'message': list(songs.values())}
+
+        case 'Make A Playlist':
+            userID = sessions.getUserID(session_id)
+            response = {'type': 'message', 'message': weighting.weightSongs(userID, sessions.getAccessToken(session_id))['txt']}
 
         # no action for text, send plain chatbot message
         case _:

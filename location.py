@@ -30,7 +30,7 @@ def getPlace():
     #placeID = "ChIJVX_yAZSOOIgRpZhJFs2DSUs"
 
     # Hardcoded Thompson Library Place ID
-    # placeID = "ChIJP74-z5eOOIgRBVNFuzx7O7U"
+    #placeID = "ChIJP74-z5eOOIgRBVNFuzx7O7U"
 
     # Get place type from user's place type
     placeDetails = httpx.get(

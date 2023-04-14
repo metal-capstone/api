@@ -10,6 +10,7 @@ import models
 import spotify
 import sessions
 import util
+import weighting
 
 from songCollection import *
 from location import *
@@ -41,9 +42,11 @@ app.add_middleware(
 app.states = set()  # set for all active states, stored only temporarily until spotify callback
 app.sessions = sessions.SessionManager()  # object for all active sessions, stores session info
 
+
 @app.on_event('startup')
 def startup_db_client():
     database.test_mongodb()
+
 
 @app.on_event('shutdown')
 def shutdown_db_client():
@@ -51,6 +54,7 @@ def shutdown_db_client():
         database.close_client()
     except Exception as e:
         print(e)
+
 
 @app.get('/')
 async def root():
@@ -100,6 +104,7 @@ async def root(state: str, background_tasks: BackgroundTasks, code: str | None =
     # remove state and return final response
     app.states.discard(state)
     return response
+
 
 @app.get('/test-mongodb')
 async def test_mongodb():
