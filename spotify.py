@@ -125,26 +125,3 @@ def playSong(access_token, ids):
     except Exception as e:
         print(e)
 
-
-# Temp function for time box 4
-
-
-def getRecSong(access_token):
-    placeValues = weighting.weightSongsTemp()
-    user_header = getUserHeader(access_token)
-    user_params = {
-        "limit": 1,
-        "seed_artists": "",
-        "seed_tracks": "",
-        "seed_genres": "hip-hop,pop",
-        "min_danceability": placeValues["danceability"]-.05,
-        "min_energy": placeValues["energy"]-.05,
-        "min_valence": placeValues["valence"]-.05,
-        "max_danceability": placeValues["danceability"]+.1,
-        "max_energy": placeValues["energy"]+.1,
-        "max_valence": placeValues["valence"]+.05,
-    }
-    song_response = httpx.get("https://api.spotify.com/v1/recommendations", params=user_params, headers=user_header)
-    song = song_response.json()
-    httpx.put("https://api.spotify.com/v1/me/player/play", json={"uris": [song['tracks'][0]['uri']]}, headers=user_header)
-    return {"type": "message", "message": song['tracks'][0]['name']}
