@@ -7,6 +7,8 @@ MONGODB_DATABASE_URL = credentials_json['mongodb-database-url']
 MONGODB_CLIENT = MongoClient(MONGODB_DATABASE_URL)
 TEST_CLUSTER = MONGODB_CLIENT['test-database']
 USER_DATA_CLUSTER = MONGODB_CLIENT['UserData']
+PLACES_CLUSTER = MONGODB_CLIENT["PlaceClusters"]
+SONG_COLLECTION_CLUSTER = MONGODB_CLIENT["UsersSpotifyData"]
 del credentials_json
 
 def close_client():
@@ -77,3 +79,14 @@ def add_spotify_data(id, name, data):
 def get_spotify_data(id, name):
     user_spotify_data = USER_DATA_CLUSTER['SpotifyData'].find_one({'user_id': id, 'name': name})
     return user_spotify_data
+
+def get_place_data(place_type):
+    place_values = PLACES_CLUSTER["PlaceType"].find_one({'Place': place_type})
+    return place_values
+
+def get_user_songs(song_query):
+    user_fav = SONG_COLLECTION_CLUSTER["FavSongs"]
+    user_rel = SONG_COLLECTION_CLUSTER["RelatedSongs"]
+    rel_songs = list(user_rel.find(song_query).limit(30))
+    fav_songs = list(user_fav.find(song_query).limit(75-len(rel_songs)))
+    return fav_songs, rel_songs

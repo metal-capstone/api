@@ -111,7 +111,7 @@ async def test_mongodb():
     response: models.TestData = database.test_mongodb()
     return response
 
-# This is the main websocket endpoint, the user provides their session id and connects to the backend if its found
+# Websocket endpoint that is the main communication between client and api, grabs session id from cookies and logs user in.
 @app.websocket('/ws')
 async def websocket_endpoint(websocket: WebSocket):
     # open connection, load session id, check session manager for valid session, and accept or deny connection

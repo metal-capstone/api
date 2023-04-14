@@ -139,8 +139,10 @@ def handleAction(text: str, session_id: str, sessions: SessionManager):
     match text:
         case 'Start Music Action':
             songs = recommendSongs(sessions.getUserID(session_id), sessions.getAccessToken(session_id), 1)
-            spotify.playSong(sessions.getAccessToken(session_id), list(songs.keys()))
-            response = {'type': 'message', 'message': list(songs.values())}
+            songURIs = [song['uri'] for song in songs]
+            songNames = [song['name'] for song in songs]
+            spotify.playSong(sessions.getAccessToken(session_id), songURIs)
+            response = {'type': 'message', 'message': songNames}
 
         case 'Make A Playlist':
             userID = sessions.getUserID(session_id)

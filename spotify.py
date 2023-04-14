@@ -11,8 +11,6 @@ scope = ' '.join(['user-read-private', 'user-read-email', 'user-top-read',
                   'user-modify-playback-state', 'playlist-modify-public', 'playlist-modify-private'])
 
 # Builds auth url from credentials and scope
-
-
 def getAuthLink(state):
     authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + \
                     credentials['spotify_client_id'] + '&scope=' + scope + \
@@ -20,8 +18,6 @@ def getAuthLink(state):
     return authorizeLink
 
 # Header and payload needed for access tokens
-
-
 def accessTokenRequestInfo(code):
     encoded_credentials = base64.b64encode(credentials['spotify_client_id'].encode() + b':' +
                                            credentials['spotify_client_secret'].encode()).decode('utf-8')
@@ -37,8 +33,6 @@ def accessTokenRequestInfo(code):
     return headers, payload
 
 # User header needed for specific user requests
-
-
 def getUserHeader(access_token):
     user_header = {
         'Authorization': 'Bearer ' + access_token,
@@ -107,10 +101,7 @@ def recommendSongs(access_token, params):
         songs_response = httpx.get("https://api.spotify.com/v1/recommendations", params=params, headers=user_header)
         if (songs_response.status_code == 200):
             songs = songs_response.json()
-            response = {}
-            for song in songs['tracks']:
-                response[song['uri']] = song['name']
-            return response
+            return songs['tracks']
         else:
             print(f"Error getting recommended songs ({songs_response.status_code})")
     except Exception as e:
@@ -124,4 +115,17 @@ def playSong(access_token, ids):
             print(f"Error playing songs ({play_response.status_code})")
     except Exception as e:
         print(e)
+
+def playContext(access_token, playlist_uri):
+    user_header = getUserHeader(access_token)
+    httpx.put("https://api.spotify.com/v1/me/player/play", json={'context_uri': playlist_uri}, headers=user_header)
+
+def createPlaylist(access_token, user_id, data):
+    user_header = getUserHeader(access_token)
+    playlist = httpx.post("https://api.spotify.com/v1/users/"+user_id+"/playlists", data=json.dumps(data), headers=user_header)
+    return playlist.json()
+
+def addToPlaylist(access_token, playlist_id, uris):
+    user_header = getUserHeader(access_token)
+    httpx.post("https://api.spotify.com/v1/playlists/" + playlist_id + "/tracks", data=json.dumps(uris), headers=user_header)
 
