@@ -1,16 +1,16 @@
-from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from models import TestData, WebSocketMessage, LogOutMessage
 from sessions import SessionManager
+from messageHandler import handleMessage
+from dataHandler import initializeUserData
 
 import secrets
 import traceback
 
 import database
 import spotify
-import dataHandler
-import messageHandler
 import util
 
 app = FastAPI()
@@ -53,12 +53,12 @@ async def root():
 
 # Endpoint that generates the authorization url and state, redirects the user
 @app.get('/spotify-login')
-async def root() -> RedirectResponse:
+async def root(request: Request) -> RedirectResponse:
     try:
         # random state to check if callback request is legitimate upon return
         state = secrets.token_urlsafe(16)
         states.add(state)
-        authorizeLink = spotify.generateAuthLink(state)
+        authorizeLink = spotify.generateAuthLink(state, (True)) #'sessionID' not in request.cookies
         return RedirectResponse(url=authorizeLink)
     except Exception as e:
         return RedirectResponse(f"http://localhost:3000/?error={e}", status_code=303)
@@ -85,7 +85,7 @@ async def root(state: str, backgroundTasks: BackgroundTasks, code: str | None = 
             database.updateSession(userID, sessionID)
         else:
             database.createUser(userID, username, refreshToken, sessionID)
-            backgroundTasks.add_task(dataHandler.initializeUserData, userID, accessToken)
+            backgroundTasks.add_task(initializeUserData, userID, accessToken)
         
         # finally redirect user back to dashboard with session id as cookie
         response = RedirectResponse('http://localhost:3000/dashboard', status_code=303)
@@ -114,7 +114,7 @@ async def websocket_endpoint(webSocket: WebSocket):
             requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
 
             # handle message commands and actions
-            await messageHandler.handleMessage(requestMessage, sessionID, sessions)
+            await handleMessage(requestMessage, sessionID, sessions)
 
         await webSocket.send_json(LogOutMessage)
 

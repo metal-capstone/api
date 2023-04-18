@@ -12,10 +12,10 @@ SCOPE = ' '.join(['user-read-private', 'user-read-email', 'user-top-read',
 REDIRECT_URI = 'http://localhost:8000/callback'
 
 # Builds auth url from credentials and scope, url goes to spotify accounts page for user approval
-def generateAuthLink(state: str) -> str:
+def generateAuthLink(state: str, showDialog: bool) -> str:
     authorizeLink = (f"https://accounts.spotify.com/authorize?response_type=code"
                      f"&client_id={CREDENTIALS['spotify_client_id']}&scope={SCOPE}"
-                     f"&redirect_uri={REDIRECT_URI}&state={state}")
+                     f"&redirect_uri={REDIRECT_URI}&state={state}&show_dialog={showDialog}")
     return authorizeLink
 
 # header to use for spotify requests for the server like auth
@@ -87,7 +87,7 @@ async def getUserTopItemsAsync(accessToken: str, type: str, timeRange: str, limi
         return [ item['uri'] for item in topItems['items'] ]
 
 # method to use spotify's recommendation endpoint, needs to have all relevant params before call
-def recommendSongs(accessToken: str, params: dict[str, any]) -> list[dict[str, any]]:
+def recommendSongs(accessToken: str, params: dict[str, any]) -> list[dict]:
     userHeader = getUserHeader(accessToken)
     songs = httpx.get("https://api.spotify.com/v1/recommendations", params=params, headers=userHeader).json()
     return songs['tracks']

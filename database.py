@@ -25,8 +25,7 @@ def createUser(userID: str, username: str, refreshToken: str, sessionID: str):
         '_id': userID,
         'username': username,
         'refreshToken': refreshToken,
-        'sessionID': sessionID,
-        'dataReady': False
+        'sessionID': sessionID
     }
 
     USER_DATA_CLUSTER['Users'].insert_one(newUser)
@@ -56,20 +55,22 @@ def getRefreshToken(userID: str) -> str:
     user = USER_DATA_CLUSTER['Users'].find_one({'_id': userID})
     return user['refreshToken']
 
-def getDataReady(userID: str) -> bool:
-    user = USER_DATA_CLUSTER['Users'].find_one({'_id': userID})
-    return user['dataReady']
-
-def setDataReady(userID: str, ready: bool):
-    USER_DATA_CLUSTER['Users'].update_one({'_id': userID}, { '$set': { 'dataReady': ready } })
-
-def createUserSpotifyData(userID: str, dataName: str):
+def createUserSpotifyData(userID: str, dataName: str, dataDesc: str):
     newSpotifyData = {
         'userID': userID,
-        'name': dataName
+        'name': dataName,
+        'desc': dataDesc,
+        'status': 'initialized'
     }
 
     USER_DATA_CLUSTER['SpotifyData'].insert_one(newSpotifyData)
+
+def setDataStatus(userID: str, dataName: str, status: str, error: str | None = None):
+    if (error):
+        updateQuery = { '$set': { 'status': status, 'error': error } }
+    else:
+        updateQuery = { '$set': { 'status': status } }
+    USER_DATA_CLUSTER['SpotifyData'].update_one({'userID': userID, 'name': dataName}, updateQuery)
 
 def clearUserSpotifyData(userID: str):
     USER_DATA_CLUSTER['SpotifyData'].delete_many({'userID': userID})

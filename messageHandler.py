@@ -1,10 +1,13 @@
 from models import WebSocketMessage, MessageTypes, CommandDetail
 from sessions import SessionManager
+from dataHandler import recommendSongs
+
 import database
 import spotify
-import httpx
+
 import weighting
-import dataHandler
+
+import httpx
 import traceback
 
 # Message handler, get message and session info, sends response if needed. Processes commands before sending to chatbot.
@@ -41,7 +44,7 @@ async def handleMessage(requestMessage: WebSocketMessage, sessionID: str, sessio
 def handleAction(text: str, session_id: str, sessions: SessionManager) -> WebSocketMessage:
     match text:
         case 'Start Music Action':
-            songs = dataHandler.recommendSongs(sessions.getUserID(session_id), sessions.getAccessToken(session_id), 1)
+            songs = recommendSongs(sessions.getUserID(session_id), sessions.getAccessToken(session_id), 10)
             songURIs = [song['uri'] for song in songs]
             songNames = [song['name'] for song in songs]
             spotify.playSong(sessions.getAccessToken(session_id), songURIs)
