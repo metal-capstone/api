@@ -2,91 +2,101 @@ from pymongo import MongoClient
 import json
 import models
 
-credentials_json = json.load(open('credentials.json'))
-MONGODB_DATABASE_URL = credentials_json['mongodb-database-url']
+credentials = json.load(open('credentials.json'))
+MONGODB_DATABASE_URL = credentials['mongodb-database-url']
 MONGODB_CLIENT = MongoClient(MONGODB_DATABASE_URL)
 TEST_CLUSTER = MONGODB_CLIENT['test-database']
 USER_DATA_CLUSTER = MONGODB_CLIENT['UserData']
-PLACES_CLUSTER = MONGODB_CLIENT["PlaceClusters"]
-SONG_COLLECTION_CLUSTER = MONGODB_CLIENT["UsersSpotifyData"]
-del credentials_json
+PLACES_CLUSTER = MONGODB_CLIENT['PlaceClusters']
+SPOTIFY_DATA_CLUSTER = MONGODB_CLIENT['SpotifyData']
+SONG_COLLECTION_CLUSTER = MONGODB_CLIENT['UsersSpotifyData']
+del credentials
 
-def close_client():
+def closeClient():
     MONGODB_CLIENT.close()
 
-def test_mongodb() -> models.TestData:
+def testMongodb() -> models.TestData:
     response = TEST_CLUSTER['test-collection'].find_one({'message': 'MongoDB connection is working'})
-    test_data: models.TestData = models.TestData(**response)
-    return test_data
+    testData: models.TestData = models.TestData(**response)
+    return testData
 
-def create_user(id, username, refresh_token, session_id):
-    new_user = {
-        '_id': id,
+def createUser(userID: str, username: str, refreshToken: str, sessionID: str):
+    newUser = {
+        '_id': userID,
         'username': username,
-        'refresh_token': refresh_token,
-        'session_id': session_id,
-        'data_ready': False
+        'refreshToken': refreshToken,
+        'sessionID': sessionID,
+        'dataReady': False
     }
 
-    USER_DATA_CLUSTER['Users'].insert_one(new_user)
+    USER_DATA_CLUSTER['Users'].insert_one(newUser)
 
-def user_exists(id):
-    num_users = USER_DATA_CLUSTER['Users'].count_documents({'_id': id}, limit = 1)
-    return num_users != 0
+def userExists(userID: str) -> bool:
+    numUsers = USER_DATA_CLUSTER['Users'].count_documents({'_id': userID}, limit = 1)
+    return numUsers != 0
 
-def clear_user(id):
-    USER_DATA_CLUSTER['Users'].delete_one({'_id': id})
+def clearUser(userID: str):
+    USER_DATA_CLUSTER['Users'].delete_one({'_id': userID})
 
-def valid_session(session_id):
-    num_users = USER_DATA_CLUSTER['Users'].count_documents({'session_id': session_id}, limit = 1)
-    return num_users != 0
+def validSession(sessionID: str) -> bool:
+    numUsers = USER_DATA_CLUSTER['Users'].count_documents({'sessionID': sessionID}, limit = 1)
+    return numUsers != 0
     
-def get_session_data(session_id):
-    user = USER_DATA_CLUSTER['Users'].find_one({'session_id': session_id})
-    return user['refresh_token'], user['_id']
+def getSessionData(sessionID: str) -> tuple[str, str]:
+    user = USER_DATA_CLUSTER['Users'].find_one({'sessionID': sessionID})
+    return user['refreshToken'], user['_id']
 
-def update_session(id, session_id):
-    USER_DATA_CLUSTER['Users'].update_one({'_id': id}, { '$set': { 'session_id': session_id } })
+def updateSession(userID: str, sessionID: str):
+    USER_DATA_CLUSTER['Users'].update_one({'_id': userID}, { '$set': { 'sessionID': sessionID } })
 
-def clear_session(session_id):
-    USER_DATA_CLUSTER['Users'].update_one({'session_id': session_id}, { '$unset': { 'session_id': 1 } })
+def clearSession(sessionID: str):
+    USER_DATA_CLUSTER['Users'].update_one({'sessionID': sessionID}, { '$unset': { 'sessionID': 1 } })
 
-def get_refresh_token(id):
-    user = USER_DATA_CLUSTER['Users'].find_one({'_id': id})
-    return user['refresh_token']
+def getRefreshToken(userID: str) -> str:
+    user = USER_DATA_CLUSTER['Users'].find_one({'_id': userID})
+    return user['refreshToken']
 
-def get_data_ready(id):
-    user = USER_DATA_CLUSTER['Users'].find_one({'_id': id})
-    return user['data_ready']
+def getDataReady(userID: str) -> bool:
+    user = USER_DATA_CLUSTER['Users'].find_one({'_id': userID})
+    return user['dataReady']
 
-def set_data_ready(id, ready):
-    USER_DATA_CLUSTER['Users'].update_one({'_id': id}, { '$set': { 'data_ready': ready } })
+def setDataReady(userID: str, ready: bool):
+    USER_DATA_CLUSTER['Users'].update_one({'_id': userID}, { '$set': { 'dataReady': ready } })
 
-def create_spotify_data(id, name):
-    new_spotify_data = {
-        'user_id': id,
-        'name': name
+def createUserSpotifyData(userID: str, dataName: str):
+    newSpotifyData = {
+        'userID': userID,
+        'name': dataName
     }
 
-    USER_DATA_CLUSTER['SpotifyData'].insert_one(new_spotify_data)
+    USER_DATA_CLUSTER['SpotifyData'].insert_one(newSpotifyData)
 
-def clear_user_spotify_data(id):
-    USER_DATA_CLUSTER['SpotifyData'].delete_many({'user_id': id})
+def clearUserSpotifyData(userID: str):
+    USER_DATA_CLUSTER['SpotifyData'].delete_many({'userID': userID})
 
-def add_spotify_data(id, name, data):
-    USER_DATA_CLUSTER['SpotifyData'].update_one({'user_id': id, 'name': name}, {'$push': data})
+def addUserSpotifyData(userID: str, dataName: str, data: dict[str, any]):
+    USER_DATA_CLUSTER['SpotifyData'].update_one({'userID': userID, 'name': dataName}, {'$push': data})
 
-def get_spotify_data(id, name):
-    user_spotify_data = USER_DATA_CLUSTER['SpotifyData'].find_one({'user_id': id, 'name': name})
-    return user_spotify_data
+def getUserSpotifyData(userID: str, dataName: str) -> dict[str, any]:
+    userSpotifyData = USER_DATA_CLUSTER['SpotifyData'].find_one({'userID': userID, 'name': dataName})
+    return userSpotifyData
 
-def get_place_data(place_type):
-    place_values = PLACES_CLUSTER["PlaceType"].find_one({'Place': place_type})
-    return place_values
+def getPlaceData(placeType: str) -> dict[str, any]:
+    placeValues = PLACES_CLUSTER['PlaceType'].find_one({'Place': placeType})
+    return placeValues
 
-def get_user_songs(song_query):
-    user_fav = SONG_COLLECTION_CLUSTER["FavSongs"]
-    user_rel = SONG_COLLECTION_CLUSTER["RelatedSongs"]
-    rel_songs = list(user_rel.find(song_query).limit(30))
-    fav_songs = list(user_fav.find(song_query).limit(75-len(rel_songs)))
-    return fav_songs, rel_songs
+def getUserSongs(songQuery):
+    userFav = SONG_COLLECTION_CLUSTER['FavSongs']
+    userRel = SONG_COLLECTION_CLUSTER['RelatedSongs']
+    relSongs = list(userRel.find(songQuery).limit(30))
+    favSongs = list(userFav.find(songQuery).limit(75-len(relSongs)))
+    return favSongs, relSongs
+
+# Only add track if it doesn't exists
+def addTrack(trackData):
+    if (SPOTIFY_DATA_CLUSTER['Tracks'].count_documents({'_id': trackData['_id']}, limit=1) == 0):
+        SPOTIFY_DATA_CLUSTER['Tracks'].insert(trackData)
+
+def getTrackData(trackID: str) -> dict[str, any]:
+    trackData = SPOTIFY_DATA_CLUSTER['Tracks'].find_one({'_id': trackID})
+    return trackData

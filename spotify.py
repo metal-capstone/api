@@ -1,131 +1,115 @@
 import httpx
 import base64
-import weighting
 import json
 
-credentials = json.load(open('credentials.json'))
+CREDENTIALS = json.load(open('credentials.json'))
 
 # This is the scope for what info we request access to on spotify, make sure to add more to it if you need more data
-scope = ' '.join(['user-read-private', 'user-read-email', 'user-top-read',
+SCOPE = ' '.join(['user-read-private', 'user-read-email', 'user-top-read',
                   'user-follow-read', 'user-library-read', 'user-read-playback-state',
                   'user-modify-playback-state', 'playlist-modify-public', 'playlist-modify-private'])
 
-# Builds auth url from credentials and scope
-def getAuthLink(state):
-    authorizeLink = 'https://accounts.spotify.com/authorize?response_type=code&client_id=' + \
-                    credentials['spotify_client_id'] + '&scope=' + scope + \
-                    '&redirect_uri=http://localhost:8000/callback&state=' + state
+REDIRECT_URI = 'http://localhost:8000/callback'
+
+# Builds auth url from credentials and scope, url goes to spotify accounts page for user approval
+def generateAuthLink(state: str) -> str:
+    authorizeLink = (f"https://accounts.spotify.com/authorize?response_type=code"
+                     f"&client_id={CREDENTIALS['spotify_client_id']}&scope={SCOPE}"
+                     f"&redirect_uri={REDIRECT_URI}&state={state}")
     return authorizeLink
 
-# Header and payload needed for access tokens
-def accessTokenRequestInfo(code):
-    encoded_credentials = base64.b64encode(credentials['spotify_client_id'].encode() + b':' +
-                                           credentials['spotify_client_secret'].encode()).decode('utf-8')
-    headers = {
-        'Authorization': 'Basic ' + encoded_credentials,
+# header to use for spotify requests for the server like auth
+def generateAuthHeader() -> dict[str, str]:
+    encodedCredentials = base64.b64encode(CREDENTIALS['spotify_client_id'].encode() + b':' +
+                                          CREDENTIALS['spotify_client_secret'].encode()).decode('utf-8')
+    return {
+        'Authorization': 'Basic ' + encodedCredentials,
         'Content-Type': 'application/x-www-form-urlencoded'
     }
-    payload = {
+
+# used in callback in main, gets the auth tokens from spotify and returns them
+def getAuthTokens(code: str) -> tuple[str, str]:
+    authHeader = generateAuthHeader()
+    authData = {
         'grant_type': 'authorization_code',
         'code': code,  # Use auth code granted from user to get access token
-        'redirect_uri': 'http://localhost:8000/callback'
+        'redirect_uri': REDIRECT_URI
     }
-    return headers, payload
+    authTokens = httpx.post(url='https://accounts.spotify.com/api/token', data=authData, headers=authHeader).json()
+    return authTokens['access_token'], authTokens['refresh_token']
+    
 
 # User header needed for specific user requests
-def getUserHeader(access_token):
-    user_header = {
-        'Authorization': 'Bearer ' + access_token,
+def getUserHeader(accessToken: str) -> dict[str, str]:
+    userHeader = {
+        'Authorization': 'Bearer ' + accessToken,
         'Content-Type': 'application/json'
     }
-    return user_header
+    return userHeader
 
-# function to get a new access token from spotify, either returns new token or raises exception
-def getAccessToken(refresh_token):
-    header, unused_payload = accessTokenRequestInfo('')
-    payload = {
+# function to get a new access token from spotify, returns new token
+def getAccessToken(refreshToken: str) -> str:
+    header = generateAuthHeader()
+    data = {
         'grant_type': 'refresh_token',
-        'refresh_token': refresh_token
+        'refresh_token': refreshToken
     }
-    access_token_response = httpx.post('https://accounts.spotify.com/api/token', data=payload, headers=header)
-    if (access_token_response.status_code == 200):
-        return access_token_response.json()['access_token']
-    else:
-        raise Exception(f"Error getting new token (Status Code: {access_token_response.status_code})")
+    tokens = httpx.post('https://accounts.spotify.com/api/token', data=data, headers=header).json()
+    return tokens['access_token']
 
-# gets users spotify info for a new session, returns uri and username. Sent to start session in util
-def getSessionUserInfo(access_token):
-    user_header = getUserHeader(access_token)
-    user_info_response = httpx.get('https://api.spotify.com/v1/me', headers=user_header)
-    if (user_info_response.status_code == 200):
-        user_info = user_info_response.json()
-        return user_info['uri'], user_info['display_name']
-    else:
-        raise Exception(f"Error getting user info (Status Code: {user_info_response.status_code})")
+# gets users spotify info for a new session, returns uri and username. Sent to start session in session manager
+def getSessionUserInfo(accessToken: str) -> tuple[str, str]:
+    userHeader = getUserHeader(accessToken)
+    userInfo = httpx.get('https://api.spotify.com/v1/me', headers=userHeader).json()
+    return userInfo['uri'], userInfo['display_name']
 
 # Users spotify info, returns username and profile picture if it exists. Sent to user via websocket
-def getUserInfo(access_token):
-    user_header = getUserHeader(access_token)
-    try:
-        user_info_response = httpx.get('https://api.spotify.com/v1/me', headers=user_header)
-        if (user_info_response.status_code == 200):
-            user_info = user_info_response.json()
-            # checks if user has a profile picture
-            if ('images' in user_info and user_info['images']):
-                return {'type': 'user-info', 'username': user_info['display_name'], 'id': user_info['id'], 'profile_pic': user_info['images'][0]['url']}
-            else:
-                return {'type': 'user-info', 'username': user_info['display_name'], 'id': user_info['id']}
-        else:
-            return {'type': 'error', 'error': f"(getUserInfo) Error getting spotify user info. (Status Code:{user_info_response.status_code})"}
-    except httpx.RequestError as error:
-        return {'type': 'error', 'error': f"(getUserInfo) Error getting response from spotify. ({error})"}
+def getUserInfo(accessToken: str) -> tuple[str, str] | str:
+    userHeader = getUserHeader(accessToken)
+    userInfo = httpx.get('https://api.spotify.com/v1/me', headers=userHeader).json()
+    # checks if user has a profile picture
+    if ('images' in userInfo and userInfo['images']):
+        return userInfo['display_name'], userInfo['images'][0]['url']
+    else:
+        return userInfo['display_name']
     
-async def getUserTopItemsAsync(access_token, type, time_range, limit, offset):
-    user_header = getUserHeader(access_token)
+# method to get users top artists or tracks, async to make large, concurrent requests quicker
+async def getUserTopItemsAsync(accessToken: str, type: str, timeRange: str, limit: int, offset: int) -> list[str]:
+    userHeader = getUserHeader(accessToken)
     params = {
-        'time_range': time_range,
+        'time_range': timeRange,
         'limit': limit,
         'offset': offset
     }
     async with httpx.AsyncClient() as client:
-        top_items_response = await client.get(f"https://api.spotify.com/v1/me/top/{type}", params=params, headers=user_header)
-        if (top_items_response.status_code == 200):
-            top_items = top_items_response.json()
-            return [ item['uri'] for item in top_items['items'] ]
-        else:
-            print(f"Error getting top items ({top_items_response.status_code})")
+        topItems = await client.get(f"https://api.spotify.com/v1/me/top/{type}", params=params, headers=userHeader)
+        topItems = topItems.json() # take json after await so it does not happen on the coroutine
+        return [ item['uri'] for item in topItems['items'] ]
 
-def recommendSongs(access_token, params):
-    user_header = getUserHeader(access_token)
-    try:
-        songs_response = httpx.get("https://api.spotify.com/v1/recommendations", params=params, headers=user_header)
-        if (songs_response.status_code == 200):
-            songs = songs_response.json()
-            return songs['tracks']
-        else:
-            print(f"Error getting recommended songs ({songs_response.status_code})")
-    except Exception as e:
-        print(e)
+# method to use spotify's recommendation endpoint, needs to have all relevant params before call
+def recommendSongs(accessToken: str, params: dict[str, any]) -> list[dict[str, any]]:
+    userHeader = getUserHeader(accessToken)
+    songs = httpx.get("https://api.spotify.com/v1/recommendations", params=params, headers=userHeader).json()
+    return songs['tracks']
 
-def playSong(access_token, ids):
-    user_header = getUserHeader(access_token)
-    try:
-        play_response = httpx.put("https://api.spotify.com/v1/me/player/play", json={"uris": ids}, headers=user_header)
-        if (play_response.status_code != 204):
-            print(f"Error playing songs ({play_response.status_code})")
-    except Exception as e:
-        print(e)
+# plays the list of song uris on the users active playback
+def playSong(accessToken: str, songURIs: list[str]):
+    userHeader = getUserHeader(accessToken)
+    httpx.put("https://api.spotify.com/v1/me/player/play", json={"uris": songURIs}, headers=userHeader)
 
-def playContext(access_token, playlist_uri):
-    user_header = getUserHeader(access_token)
-    httpx.put("https://api.spotify.com/v1/me/player/play", json={'context_uri': playlist_uri}, headers=user_header)
+# plays the context (album or playlist) on the users active playback
+def playContext(accessToken: str, contextURI: str):
+    userHeader = getUserHeader(accessToken)
+    httpx.put("https://api.spotify.com/v1/me/player/play", json={'context_uri': contextURI}, headers=userHeader)
 
-def createPlaylist(access_token, user_id, data):
-    user_header = getUserHeader(access_token)
-    playlist = httpx.post("https://api.spotify.com/v1/users/"+user_id+"/playlists", data=json.dumps(data), headers=user_header)
+# creates playlist on users profile, returns new playlist data, needs all relevant data before call
+def createPlaylist(accessToken: str, userID: str, data: dict[str, any]) -> dict[str, any]:
+    userHeader = getUserHeader(accessToken)
+    playlist = httpx.post(f"https://api.spotify.com/v1/users/{userID}/playlists", json=data, headers=userHeader)
     return playlist.json()
 
-def addToPlaylist(access_token, playlist_id, uris):
-    user_header = getUserHeader(access_token)
-    httpx.post("https://api.spotify.com/v1/playlists/" + playlist_id + "/tracks", data=json.dumps(uris), headers=user_header)
+# adds the song uris to the playlist
+def addToPlaylist(accessToken: str, playlistID: str, songURIS: list[str]):
+    userHeader = getUserHeader(accessToken)
+    httpx.post(f"https://api.spotify.com/v1/playlists/{playlistID}/tracks", json=songURIS, headers=userHeader)
 

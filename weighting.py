@@ -6,7 +6,7 @@ def weightSongs(userID, token):
 
     placeType = location.getPlace()
 
-    placeValues = database.get_place_data(placeType)
+    placeValues = database.getPlaceData(placeType)
 
     lim = 75
 
@@ -15,7 +15,7 @@ def weightSongs(userID, token):
         "$gte": (placeValues["energy"]-0.1), "$lte": (placeValues["energy"]+.1)}, "valence": {
         "$gte": (placeValues["valence"]-0.1), "$lte": (placeValues["valence"]+.1)}}
 
-    favSongs, relSongs = database.get_user_songs(songQuery)
+    favSongs, relSongs = database.getUserSongs(songQuery)
 
     lim = 75 - len(relSongs) - len(favSongs)
 
