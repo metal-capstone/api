@@ -8,12 +8,12 @@ from location import *
 credentials_json = json.load(open("credentials.json"))
 client = credentials_json["spotify_client_id"]
 secret = credentials_json["spotify_client_secret"]
+db_url = credentials_json["mongodb-database-url"]
 
 
 def weightSongs(userID, token):
 
-    dbClient = pymongo.MongoClient(
-        "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
+    dbClient = pymongo.MongoClient(db_url, tlsCAFile=certifi.where())
 
     placeDB = dbClient["PlaceClusters"]
 

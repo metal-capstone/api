@@ -7,7 +7,7 @@ import certifi
 credentials_json = json.load(open("credentials.json"))
 client = credentials_json["spotify_client_id"]
 secret = credentials_json["spotify_client_secret"]
-
+db_url = credentials_json["mongodb-database-url"]
 
 auth_url = 'https://accounts.spotify.com/api/token'
 data = {
@@ -16,8 +16,7 @@ data = {
     'client_secret': secret
 }
 
-dbClient = pymongo.MongoClient(
-    "mongodb+srv://metal-user:djKjLBF62wmcu0gl@spotify-chatbot-cluster.pnezn7m.mongodb.net/?retryWrites=true&w=majority", tlsCAFile=certifi.where())
+dbClient = pymongo.MongoClient(db_url, tlsCAFile=certifi.where())
 
 myDB = dbClient["PlaceClusters"]
 
