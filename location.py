@@ -1,4 +1,4 @@
-import requests
+import httpx
 import json
 
 credentials_json = json.load(open("credentials.json"))
@@ -8,7 +8,7 @@ apiKey = credentials_json["maps_key"]
 def getPlace():
     apiKey = credentials_json["maps_key"]
     # Get user's geolocation
-    geoloc = requests.post(
+    geoloc = httpx.post(
         "https://www.googleapis.com/geolocation/v1/geolocate?key="+apiKey).json()
     # print(geoloc)
 
@@ -16,7 +16,7 @@ def getPlace():
     lng = geoloc["location"]["lng"]
 
     # Reverse gerolocation to get address
-    addressData = requests.get("https://maps.googleapis.com/maps/api/geocode/json?latlng=" +
+    addressData = httpx.get("https://maps.googleapis.com/maps/api/geocode/json?latlng=" +
                                str(lat) + "," + str(lng) + "&key="+apiKey).json()
     address = addressData["results"][0]["formatted_address"]
 
@@ -33,7 +33,7 @@ def getPlace():
     #placeID = "ChIJP74-z5eOOIgRBVNFuzx7O7U"
 
     # Get place type from user's place type
-    placeDetails = requests.get(
+    placeDetails = httpx.get(
         "https://maps.googleapis.com/maps/api/place/details/json?place_id=" + placeID + "&fields=types&key="+apiKey).json()
 
     placeType = placeDetails['result']['types'][0]

@@ -1,19 +1,17 @@
-from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import RedirectResponse, Response
+from fastapi import BackgroundTasks, FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pymongo import MongoClient
+from models import TestData, WebSocketMessage, LogOutMessage
+from sessions import SessionManager
+from messageHandler import handleMessage
+from dataHandler import initializeUserData
 
-import string
-import random
-import requests
+import secrets
+import traceback
 
 import database
-import models
 import spotify
-import weighting
-
-from songCollection import *
-from location import *
+import util
 
 app = FastAPI()
 
@@ -32,148 +30,96 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
-app.states = {}  # dict of tokens for all logged in users, theres definitely a better way to do this but it works for now
+# app.add_middleware(
+#     util.DelayMiddleware,
+#     delayMin=3,
+#     delayRange=2
+# )
 
+states = set()  # set for all active states, stored only temporarily until spotify callback
+sessions = SessionManager()
 
 @app.on_event('startup')
-def startup_db_client():
-    app.mongodb_client = MongoClient(database.MONGODB_DATABASE_URL)
-    app.database = app.mongodb_client[database.MONGODB_CLUSTER_NAME]
-
-    database.test_mongodb(app.database)
-
+def startupDBClient():
+    database.testMongodb()
 
 @app.on_event('shutdown')
-def shutdown_db_client():
-    app.mongodb_client.close()
-
+def shutdownDBClient():
+    database.closeClient()
 
 @app.get('/')
 async def root():
     return {'message': 'api is running'}
 
-# Endpoint that generates the authorization url for the user
-
-
+# Endpoint that generates the authorization url and state, redirects the user
 @app.get('/spotify-login')
-async def root():
-    # random state to check if callback request is legitimate, and for identifying user in future callbacks
-    state = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-    app.states[state] = ['', '']
-    authorizeLink = spotify.getAuthLink(state)
-    return {'auth_url': authorizeLink, 'state': state}
+async def root(request: Request) -> RedirectResponse:
+    try:
+        # random state to check if callback request is legitimate upon return
+        state = secrets.token_urlsafe(16)
+        states.add(state)
+        authorizeLink = spotify.generateAuthLink(state, (True)) #'sessionID' not in request.cookies
+        return RedirectResponse(url=authorizeLink)
+    except Exception as e:
+        return RedirectResponse(f"http://localhost:3000/?error={e}", status_code=303)
 
-# Endpoint for the callback from the spotify login, updates access token and redirect user to dashboard when successful.
-# code is the key to get users auth tokens, if it fails you get error instead. If it fails remove state from states
-
-
+# Endpoint for the callback from the spotify login, stores tokens, starts session, and redirects to dashboard when successful.
+# code is the key to get users auth tokens, if it fails you get error instead. Generates users session id cookie and removes state.
 @app.get('/callback')
-async def root(state: str, background_tasks: BackgroundTasks, code: str | None = None, error: str | None = None):
-    if (state not in app.states):  # simple check to see if request is from spotify
-        app.states.pop(state)
-        return RedirectResponse('http://localhost:3000/?error=state_mismatch', status_code=303)
-    elif (error is not None):  # Check if theres an error from spotify
-        app.states.pop(state)
+async def root(state: str, backgroundTasks: BackgroundTasks, code: str | None = None, error: str | None = None) -> RedirectResponse:
+    # Guard checks for any spotify errors or unknown callbacks, sends them back to login
+    if (error):
         return RedirectResponse(f"http://localhost:3000/?error=spotify_{error}", status_code=303)
-    else:
-        try:
-            headers, payload = spotify.accessTokenRequestInfo(code)
-            access_token_request = requests.post(
-                url='https://accounts.spotify.com/api/token', data=payload, headers=headers)
-
-            # upon token success, store tokens and redirect
-            if (access_token_request.status_code == 200):
-                app.states[state][0] = access_token_request.json()[
-                    'access_token']
-                app.states[state][1] = access_token_request.json()[
-                    'refresh_token']
-
-                #background_tasks.add_task(songCollection, app.states[state][0])
-
-                return RedirectResponse('http://localhost:3000/dashboard', status_code=303)
-            else:
-                app.states.pop(state)
-                return RedirectResponse('http://localhost:3000/?error=invalid_token', status_code=303)
-        except requests.exceptions.RequestException:
-            app.states.pop(state)
-            return RedirectResponse('http://localhost:3000/?error=spotify_accounts_error', status_code=303)
-
+    if (state not in states):
+        return RedirectResponse('http://localhost:3000/?error=state_mismatch', status_code=303)
+    
+    try:
+        # Callback successful, delete state and get access tokens and user info
+        states.discard(state)
+        accessToken, refreshToken = spotify.getAuthTokens(code)
+        userID, username = spotify.getSessionUserInfo(accessToken)
+        # Generate a new session id to be used to identify browser in the future
+        sessionID = secrets.token_urlsafe(16)
+        # check db for user and create them if needed, init user data also
+        if (database.userExists(userID)):
+            database.updateSession(userID, sessionID)
+        else:
+            database.createUser(userID, username, refreshToken, sessionID)
+            backgroundTasks.add_task(initializeUserData, userID, accessToken)
+        
+        # finally redirect user back to dashboard with session id as cookie
+        response = RedirectResponse('http://localhost:3000/dashboard', status_code=303)
+        response.set_cookie(key='sessionID', value=sessionID)
+        return response
+    
+    except Exception as e:
+        return RedirectResponse(f"http://localhost:3000/?error={e}", status_code=303)
 
 @app.get('/test-mongodb')
 async def test_mongodb():
-    response: models.TestData = database.test_mongodb(app.database)
+    response: TestData = database.testMongodb()
     return response
 
-# Simple endpoint to check if a state is valid for a session, 404 if not found
+# Websocket endpoint that is the main communication between client and api, grabs session id from cookies and logs user in.
+# Handle session level errors here.
+@app.websocket('/ws')
+async def websocket_endpoint(webSocket: WebSocket):
+    try:
+        sessionID = webSocket.cookies['sessionID']
+        # Attempt to start session with session manager
+        await sessions.startSession(sessionID, webSocket)
 
+        # Constant check to only accept messages if session is valid. Wont enter if session never started
+        while sessions.validSession(sessionID):
+            requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
 
-@app.get('/{state}/session-valid')
-async def root(state: str, response: Response):
-    if (state in app.states):
-        return {'message': 'session-valid'}
-    else:
-        response.status_code = 404
-        return {'error': 'session not found'}
+            # handle message commands and actions
+            await handleMessage(requestMessage, sessionID, sessions)
 
-# Endpoint to end a session, removes state from list of states
+        await webSocket.send_json(LogOutMessage)
 
-
-@app.post('/{state}/session-logout')
-async def root(state: str):
-    if (state in app.states):
-        app.states.pop(state)
-        return {"message": "Logout Successful"}
-
-# This is the main websocket endpoint, the user provides their state and connects to the backend if its found
-
-
-@app.websocket('/{state}/ws')
-async def websocket_endpoint(websocket: WebSocket, state: str):
-    if (state in app.states):
-        await websocket.accept()
-        await websocket.send_json(spotify.getUserInfo(app.states[state][0]))
-        # Send token for web player
-        await websocket.send_json({'type': 'spotify-token', 'token': app.states[state][0]})
-        try:  # Try until disconnection
-            while True:  # Main loop to wait for user message and then handle it
-                data = await websocket.receive_text()  # Get message
-
-                # Command handler, check if message is a command before sending it to chatbot
-                if (data.startswith('!state')):
-                    response = {'type': 'message',
-                                'message': f"State: {state}"}
-                else:  # Not a command, send to chatbot
-                    try:  # Try to request chatbot, will fail if it is not running
-                        headers, payload = {
-                            'Content-Type': 'text/plain'}, {'message': data, 'sender': state}
-                        chatbot_response = requests.post(
-                            url='http://setup-rasa-1:5005/webhooks/rest/webhook', json=payload, headers=headers)
-
-                        # Parse message if request is valid and message is not empty
-                        if (chatbot_response.status_code == 200 and chatbot_response.json()):
-                            response = {'type': 'message', 'message': chatbot_response.json()[
-                                0]['text']}
-
-                            # Action handler, perform certain actions based on chatbot response
-                            if (response['message'] == 'Start Music Action'):
-                                response['message'] = spotify.getRecSong(
-                                    app.states[state][0])['song']
-                            elif (response['message'] == 'Make A Playlist'):
-                                userID = spotify.getUserInfo(
-                                    app.states[state][0])['id']
-                                response['message'] = weighting.weightSongs(
-                                    userID, app.states[state][0])['txt']
-
-                        else:
-                            response = {
-                                'type': 'error', 'error': f"Error receiving message: {chatbot_response.status_code}"}
-                    except requests.exceptions.RequestException as error:
-                        response = {
-                            'type': 'error', 'error': f"Error sending chatbot request. ({error})"}
-
-                # Send the user the final response
-                await websocket.send_json(response)
-        except WebSocketDisconnect:
-            print('User Disconnected')
-    else:
-        print('Session not found')
+    except WebSocketDisconnect: # user disconnect
+        sessions.disconnectSession(sessionID)
+    except Exception as e: # handle all other errors
+        traceback.print_exc()
+        sessions.disconnectSession(sessionID)
