@@ -13,6 +13,11 @@ algorithms = {
         'timeRanges': ['short_term', 'medium_term', 'long_term'],
         'itemsLimit': 10,
         'maxRecQueries': 10
+    },
+    'songCollection': {
+        'name': 'Song Collection',
+        'desc': 'Collects songs that the user listens to and related songs, picks these songs for recommendations based on audio features',
+        'active': True
     }
 }
 
@@ -23,8 +28,8 @@ async def initializeUserData(userID: str, accessToken: str):
     try:
         if (algorithms['topItems']['active']):
             topItemsAlgo = algorithms['topItems']
-            completed[topItemsAlgo['name']] = False
             database.createUserSpotifyData(userID, topItemsAlgo['name'], topItemsAlgo['desc'])
+            completed[topItemsAlgo['name']] = False
             topItems = await asyncio.gather(
                 *[spotify.getUserTopItemsAsync(accessToken, itemType, timeRanges, topItemsAlgo['itemsLimit'], 0) 
                   for itemType in topItemsAlgo['types'] for timeRanges in topItemsAlgo['timeRanges']]
