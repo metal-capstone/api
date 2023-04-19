@@ -72,7 +72,6 @@ OPENAI_SECRET_KEY = credentials_json["openai_secret_key"]
 del credentials_json
 
 llm = OpenAI(temperature=0.05, openai_api_key=OPENAI_SECRET_KEY)
-# search = SerpAPIWrapper(serpapi_api_key="AIzaSyCDavyaCu-z4s04yZ7cTysNuBUzgDD988c")
 llm_math_chain = LLMMathChain(llm=llm, verbose=True)
 tools = [
     Tool(
