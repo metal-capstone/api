@@ -148,7 +148,7 @@ class Chain:
     request for types of music based on how it sounds. If the user requests something specific, retrieve 
     the necessary spotify IDs with tools. You can also press play pause skip and back on the user's music 
     player the Music Player Controller tool. You don't need to use the Music Player Controller if you have used 
-    the Spotify ID Extractor. Always respond to the user before finishing. The user 
+    the Spotify ID Extractor. Always respond to the user before finishing. The user may also talk to you without making music related requests. Talk to the user as well if they are making conversation. The user 
     said '{user_input}'""")
         return res
     
