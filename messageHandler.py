@@ -29,8 +29,8 @@ async def handleMessage(requestMessage: WebSocketMessage, sessionID: str, sessio
         message = data['message']
         access_token = sessions.getAccessToken(sessionID)
         agent_chain = Chain(access_token)
-        agent_chain.run(message)
-        await webSocket.send_json({'type': 1, 'detail':'hello'})
+        res = agent_chain.run(message)
+        await webSocket.send_json({'type': 1, 'detail':res})
         # # error and break from function if empty response
         # if (not chatbotResponse):
         #     await webSocket.send_json(WebSocketMessage(type=MessageTypes.ERROR, detail='Chatbot sent empty message.'))
