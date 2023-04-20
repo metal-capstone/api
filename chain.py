@@ -2,7 +2,7 @@ import json
 import httpx
 from langchain.agents import initialize_agent, Tool
 from langchain.agents import AgentType
-from langchain.tools import BaseTool
+# from langchain.tools import BaseTool
 from langchain.llms import OpenAI
 from langchain import LLMMathChain, SerpAPIWrapper
 from langchain.prompts import PromptTemplate
@@ -67,29 +67,56 @@ def getSpotifyIds(query):
     search_spotify(search_params)
     return search_params
 
+def getResponse(query):
+    print(query)
+
 credentials_json = json.load(open("credentials.json"))
 OPENAI_SECRET_KEY = credentials_json["openai_secret_key"]
 del credentials_json
 
-llm = OpenAI(temperature=0.05, openai_api_key=OPENAI_SECRET_KEY)
-llm_math_chain = LLMMathChain(llm=llm, verbose=True)
-tools = [
-    Tool(
-        name="Spotify ID Extractor",
-        func=getSpotifyIds,
-        description="Ask questions like What is the song ID of song_name? What is the album ID album_name? or What is the artist ID of artist_name? or What is the song ID of song_name by artist_name? (Do not modify or infer any information about a song, album, or artist In other words, if the user does not provide an artist name, do not auto fill it)"
-    ),
-    Tool(
-        name="Calculator",
-        func=llm_math_chain.run,
-        description="useful for when you need to answer questions about math"
-    )
-]
+class Chain:
+    def __init__(self, access_token):
+        self.access_token = access_token
+        llm = OpenAI(temperature=0.05, openai_api_key=OPENAI_SECRET_KEY)
+        tools = [
+            Tool(
+                name="Spotify ID Extractor",
+                func=getSpotifyIds,
+                description="Do not use this tool unless the user asks for an exact artist, album, or song in their message Ask questions like What is the song ID of song_name? What is the album ID album_name? or What is the artist ID of artist_name? or What is the song ID of song_name by artist_name? (Do not modify or infer any information about a song, album, or artist In other words, if the user does not provide an artist name, do not auto fill it)"
+            ),
+            Tool(
+                name="Music Playback Controller",
+                func=self.interactWithPlayback,
+                description="Controls the music player buttons for play, pause, skip, and back. Use this tool when the user wishes to perform one of these actions. For this tool to work you must input one of these words: play, pause, skip, back. If you use this tool, do not use the Spotify ID Extractor as well."
+            ),
+            Tool(
+                name="Respond to user",
+                func=getResponse,
+                description="A user friendly response creator. Always use this tool at the end when no other tool is needed so that a nice response is made for the user."
+            )
+        ]
+        self.agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 
-agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
+    def interactWithPlayback(self, query):
+        print(query)
+        userHeader = userHeader = {
+            'Authorization': 'Bearer ' + self.access_token,
+            'Content-Type': 'application/json'
+        }
+        if query == 'play':
+            res = httpx.put("https://api.spotify.com/v1/me/player/play", headers=userHeader).json()
+        elif query == 'pause':
+            res = httpx.put("https://api.spotify.com/v1/me/player/pause", headers=userHeader).json()
+        elif query == 'skip':
+            res = httpx.post("https://api.spotify.com/v1/me/player/next", headers=userHeader).json()
+        elif query == 'back':
+            res = httpx.post("https://api.spotify.com/v1/me/player/previous", headers=userHeader).json()
+        
 
-user_input = "Play One by U2"
-agent.run(f"""You are a DJ that talks to a user and plays music based on what the user requests.
-The user can request music from specific artists, songs, or albums. The user can also make open ended
-request for types of music based on how it sounds. If the user requests something specific, retrieve 
-the necessary spotify IDs with tools. Make sure to use the tool exactly as described. The user said '{user_input}'""")
+    def run(self, user_input):
+        # user_input = "Play One by U2"
+        self.agent.run(f"""You are a DJ that talks to a user and plays music based on what the user requests.
+    The user can request music from specific artists, songs, or albums. The user can also make open ended
+    request for types of music based on how it sounds. If the user requests something specific, retrieve 
+    the necessary spotify IDs with tools. Always use the 'Respond to user tool' before finishing. The user 
+    said '{user_input}'""")
