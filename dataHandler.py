@@ -45,6 +45,12 @@ async def initializeUserData(userID: str, accessToken: str):
             if (not completed[algoName]):
                 database.setDataStatus(userID, algoName, 'failed', str(e))
 
+def initDataDemo(userID: str, artists):
+    database.createUserSpotifyData(userID, 'Top Items', 'Data for the poster pres demo')
+    database.addUserSpotifyData(userID, 'Top Items', {'topArtists': { '$each': artists }})
+    database.setDataStatus(userID, 'Top Items', 'ready')
+
+
 # method that is called when we want to recommend songs to the user, chooses a algorithm to pick out songs
 def recommendSongs(userID: str, accessToken: str, location: str, numSongs: int) -> list[dict[str, any]] | None:
     if (algorithms['topItems']['active']):
@@ -72,7 +78,7 @@ def recommendSongs(userID: str, accessToken: str, location: str, numSongs: int) 
         else:
             params = {}
         for i in range(queries):
-            choice = random.choices(['topArtists', 'topTracks'])[0]
+            choice = 'topArtists'#random.choices(['topArtists', 'topTracks'])[0]
             itemURI = random.choices(topItems[choice])[0]
             itemID = itemURI.split(':')[2]
             params['limit'] =  numSongsPerQuery + (1 if (i<step) else 0)

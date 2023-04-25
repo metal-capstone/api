@@ -85,7 +85,7 @@ async def root(state: str, backgroundTasks: BackgroundTasks, code: str | None = 
             database.updateSession(userID, sessionID)
         else:
             database.createUser(userID, username, refreshToken, sessionID)
-            backgroundTasks.add_task(initializeUserData, userID, accessToken)
+            #backgroundTasks.add_task(initializeUserData, userID, accessToken)
         
         # finally redirect user back to dashboard with session id as cookie
         response = RedirectResponse('http://localhost:3000/dashboard', status_code=303)
@@ -111,6 +111,7 @@ async def websocket_endpoint(webSocket: WebSocket):
 
         # Constant check to only accept messages if session is valid. Wont enter if session never started
         while sessions.validSession(sessionID):
+            await sessions.startDemo(sessionID)
             requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
 
             # handle message commands and actions

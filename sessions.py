@@ -1,7 +1,8 @@
 from fastapi import WebSocket
-from models import Session, LoginMessage, SessionNotFoundMessage, BaseDataMessage
+from models import Session, LoginMessage, SessionNotFoundMessage, BaseDataMessage, MessageTypes, WebSocketMessage
 import spotify
 import database
+import dataHandler
 
 # Object that tracks all current sessions, stores each session in a Session object with needed data
 class SessionManager:
@@ -30,6 +31,8 @@ class SessionManager:
     async def initSessionData(self, sessionID: str):
         webSocket = self.getWebSocket(sessionID)
         username, profilePic = spotify.getUserInfo(self.getAccessToken(sessionID))
+        username = "Demo User"
+        profilePic = None
         accessToken = self.getAccessToken(sessionID)
         initDataMessage = BaseDataMessage
         if (profilePic):
@@ -46,6 +49,19 @@ class SessionManager:
                 'token': accessToken
             }
         await webSocket.send_json(initDataMessage)
+
+    async def startDemo(self, sessionID: str):
+        webSocket = self.getWebSocket(sessionID)
+        await webSocket.send_json({"type": MessageTypes.MESSAGE, "detail": "Hello! I am Spotify Chatbot, could you give me the names of some of the artists you listen to?"})
+        requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
+        # call lang
+        dataHandler.initDataDemo(self.getUserID(sessionID), artists)
+        await webSocket.send_json({"type": MessageTypes.MESSAGE, "detail": "Awesome I will take note of that. What location would you like to be at? (Only Bar and Library are supported)"})
+        requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
+        while (requestMessage['detail'] != 'Bar' and requestMessage['detail'] != 'bar' and requestMessage['detail'] != 'Library' and requestMessage['detail'] != 'library'):
+            await webSocket.send_json({"type": MessageTypes.MESSAGE, "detail": "Sorry I didn't understand that, Only Bar and Library are supported locations for the demo. Please try again."})
+            requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
+        self.setLocation(sessionID, requestMessage['detail'].title())
             
     def validSession(self, sessionID: str) -> bool:
         return sessionID in self.activeSessions
