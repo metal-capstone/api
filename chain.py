@@ -7,6 +7,7 @@ from langchain.llms import OpenAI
 from langchain import LLMMathChain, SerpAPIWrapper
 from langchain.prompts import PromptTemplate
 import spotify
+from messageHandler import handleAction
 
 credentials_json = json.load(open("credentials.json"))
 OPENAI_SECRET_KEY = credentials_json["openai_secret_key"]
@@ -66,8 +67,10 @@ def getResponse(query):
     print(query)
 
 class Chain:
-    def __init__(self, access_token):
+    def __init__(self, access_token,sessionID, sessions):
         self.access_token = access_token
+        self.sessionID = sessionID
+        self.sessions = sessions
         llm = OpenAI(temperature=0.05, openai_api_key=OPENAI_SECRET_KEY)
         tools = [
             Tool(
@@ -80,13 +83,24 @@ class Chain:
                 func=self.interactWithPlayback,
                 description="Controls the music player buttons for play, pause, skip, and back. Use this tool when the user wishes to perform one of these actions. For this tool to work you must input one of these words: play, pause, skip, back. If you use this tool, do not use the Spotify ID Extractor as well."
             ),
-            # Tool(
-            #     name="Respond to user",
-            #     func=getResponse,
-            #     description="A user friendly response creator. Always use this tool at the end when no other tool is needed so that a nice response is made for the user. When using this tool provide context about what was done to handle the users request so an adequate response can be made."
-            # )
+            Tool(
+                name="Play new music",
+                func=self.playMusic,
+                description="Use this tool when the user says something like refresh or shuffle the music."
+            ),
+            Tool(
+                name="Make a playlist",
+                func=self.makePlaylist,
+                description="Use this tool when the user expresses interest in making a new playlist. The user should say something along the lines of 'I want to create a new playlist'."
+            )
         ]
         self.agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
+
+    def playMusic(self):
+        handleAction('Start Music Action', self.sessionID, self.sessions)
+    
+    def makePlaylist(self):
+        handleAction('Make A Playlist', self.sessionID, self.sessions)
 
     def interactWithPlayback(self, query):
         print(query)

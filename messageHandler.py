@@ -33,7 +33,7 @@ async def handleMessage(requestMessage: WebSocketMessage, sessionID: str, sessio
         # chatbotResponse = httpx.post(url='http://setup-rasa-1:5005/webhooks/rest/webhook', json=data, headers=headers).json()
         message = data['message']
         access_token = sessions.getAccessToken(sessionID)
-        agent_chain = Chain(access_token)
+        agent_chain = Chain(access_token, sessionID, sessions)
         res = agent_chain.run(message)
         await webSocket.send_json({'type': 1, 'detail':res})
         # # error and break from function if empty response
