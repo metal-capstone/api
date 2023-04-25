@@ -71,7 +71,7 @@ def getUserInfo(accessToken: str) -> tuple[str, str] | str:
     if ('images' in userInfo and userInfo['images']):
         return userInfo['display_name'], userInfo['images'][0]['url']
     else:
-        return userInfo['display_name']
+        return userInfo['display_name'], None
     
 # method to get users top artists or tracks, async to make large, concurrent requests quicker
 async def getUserTopItemsAsync(accessToken: str, type: str, timeRange: str, limit: int, offset: int) -> list[str]:
