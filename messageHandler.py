@@ -10,6 +10,7 @@ import weighting
 
 import httpx
 import traceback
+from chain import Chain
 
 # Message handler, get message and session info, sends response if needed. Processes commands before sending to chatbot.
 # Handle message level errors here.
@@ -29,16 +30,20 @@ async def handleMessage(requestMessage: WebSocketMessage, sessionID: str, sessio
 
         # send to chatbot
         headers, data = {'Content-Type': 'text/plain'}, {'message': requestMessage['detail'], 'sender': sessionID}
-        chatbotResponse = httpx.post(url='http://setup-rasa-1:5005/webhooks/rest/webhook', json=data, headers=headers).json()
+        # chatbotResponse = httpx.post(url='http://setup-rasa-1:5005/webhooks/rest/webhook', json=data, headers=headers).json()
+        message = data['message']
+        access_token = sessions.getAccessToken(sessionID)
+        agent_chain = Chain(access_token)
+        res = agent_chain.run(message)
+        await webSocket.send_json({'type': 1, 'detail':res})
+        # # error and break from function if empty response
+        # if (not chatbotResponse):
+        #     await webSocket.send_json(WebSocketMessage(type=MessageTypes.ERROR, detail='Chatbot sent empty message.'))
+        #     return None
 
-        # error and break from function if empty response
-        if (not chatbotResponse):
-            await webSocket.send_json(WebSocketMessage(type=MessageTypes.ERROR, detail='Chatbot sent empty message.'))
-            return None
-
-        # handle chatbot response, should always have a response
-        response = handleAction(chatbotResponse[0]['text'], sessionID, sessions)
-        await webSocket.send_json(response)
+        # # handle chatbot response, should always have a response
+        # response = handleAction(chatbotResponse[0]['text'], sessionID, sessions)
+        # await webSocket.send_json(response)
         
     # Handles message level errors
     except Exception as e:
