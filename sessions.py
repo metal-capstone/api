@@ -23,7 +23,7 @@ class SessionManager:
         # always get a new access token upon login
         refreshToken, userID = database.getSessionData(sessionID)
         accessToken = spotify.getAccessToken(refreshToken)
-        self.activeSessions[sessionID] = Session(accessToken=accessToken, userID=userID, webSocket=webSocket)
+        self.activeSessions[sessionID] = Session(accessToken=accessToken, userID=userID, webSocket=webSocket, location='N/A')
         await self.initSessionData(sessionID)
     
     # called after starting a session, send over relevant data to start a session client side
@@ -65,3 +65,9 @@ class SessionManager:
     
     def getWebSocket(self, sessionID: str) -> WebSocket:
         return self.activeSessions[sessionID]['webSocket']
+    
+    def setLocation(self, sessionID: str, location: str):
+        self.activeSessions[sessionID]['location'] = location
+
+    def getLocation(self, sessionID: str) -> str:
+        return self.activeSessions[sessionID]['location']

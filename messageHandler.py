@@ -1,6 +1,7 @@
 from models import WebSocketMessage, MessageTypes, CommandDetail
 from sessions import SessionManager
 from dataHandler import recommendSongs
+from location import getPlace
 
 import database
 import spotify
@@ -17,13 +18,17 @@ async def handleMessage(requestMessage: WebSocketMessage, sessionID: str, sessio
     webSocket = sessions.getWebSocket(sessionID)
     try:
         # If the message is a command, handle it and break from function
-        if (requestMessage['type'] != MessageTypes.MESSAGE):
+        if (requestMessage['type'] == MessageTypes.COMMAND):
             response = handleCommand(requestMessage['detail'], sessionID, sessions)
             if (response):
                 await webSocket.send_json(response)
             return None
-    
-        # # send to chatbot
+        
+        if (requestMessage['type'] == MessageTypes.DATA):
+            getPlace(requestMessage['detail']['lat'], requestMessage['detail']['long'])
+            return None
+
+        # send to chatbot
         headers, data = {'Content-Type': 'text/plain'}, {'message': requestMessage['detail'], 'sender': sessionID}
         # chatbotResponse = httpx.post(url='http://setup-rasa-1:5005/webhooks/rest/webhook', json=data, headers=headers).json()
         message = data['message']
@@ -49,15 +54,17 @@ async def handleMessage(requestMessage: WebSocketMessage, sessionID: str, sessio
 def handleAction(text: str, session_id: str, sessions: SessionManager) -> WebSocketMessage:
     match text:
         case 'Start Music Action':
-            songs = recommendSongs(sessions.getUserID(session_id), sessions.getAccessToken(session_id), 10)
+            location = sessions.getLocation(session_id)
+            songs = recommendSongs(sessions.getUserID(session_id), sessions.getAccessToken(session_id), location, 5)
             songURIs = [song['uri'] for song in songs]
             songNames = [song['name'] for song in songs]
             spotify.playSong(sessions.getAccessToken(session_id), songURIs)
-            return WebSocketMessage(type=MessageTypes.MESSAGE, detail=songNames)
+            return WebSocketMessage(type=MessageTypes.MESSAGE, detail=f"Playing Songs based off of your location ({location}) and listening history. Queued 5")
 
         case 'Make A Playlist':
+            location = sessions.getLocation(session_id)
             userID = sessions.getUserID(session_id)
-            messageText = weighting.weightSongs(userID, sessions.getAccessToken(session_id))['txt']
+            messageText = weighting.weightSongs(userID, sessions.getAccessToken(session_id), location)['txt']
             return WebSocketMessage(type=MessageTypes.MESSAGE, detail=messageText)
 
         # no action for text, send plain chatbot message
@@ -102,6 +109,19 @@ def handleCommand(data: CommandDetail, session_id: str, sessions: SessionManager
                 return WebSocketMessage(type=MessageTypes.INFO, detail=f"User ({user_id}) successfully cleared from db. Logging out")
             else:
                 return WebSocketMessage(type=MessageTypes.ERROR, detail=f"Error: Unknown user command ({data['message'][0]})")
+            
+        case '!location':
+            if (not data['params']): # no params
+                location = sessions.getLocation(session_id)
+                return WebSocketMessage(type=MessageTypes.INFO, detail=f"Location: {location}")
+            elif (data['params'][0] == 'Bar'):
+                sessions.setLocation(session_id, 'Bar')
+                return WebSocketMessage(type=MessageTypes.INFO, detail=f"Location manually set to Bar")
+            elif (data['params'][0] == 'Library'):
+                sessions.setLocation(session_id, 'Library')
+                return WebSocketMessage(type=MessageTypes.INFO, detail=f"Location manually set to Library")
+            else:
+                return WebSocketMessage(type=MessageTypes.ERROR, detail=f"Error: Unknown location command ({data['message'][0]})")
 
         case _: # unsupported message type
             return WebSocketMessage(type=MessageTypes.ERROR, detail=f"Error processing message, unsupported message type. ({data['type']})")

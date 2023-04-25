@@ -89,7 +89,7 @@ async def getUserTopItemsAsync(accessToken: str, type: str, timeRange: str, limi
 # method to use spotify's recommendation endpoint, needs to have all relevant params before call
 def recommendSongs(accessToken: str, params: dict[str, any]) -> list[dict]:
     userHeader = getUserHeader(accessToken)
-    songs = httpx.get("https://api.spotify.com/v1/recommendations", params=params, headers=userHeader).json()
+    songs = httpx.get("https://api.spotify.com/v1/recommendations", params=params, headers=userHeader, timeout=10.0).json()
     return songs['tracks']
 
 # plays the list of song uris on the users active playback

@@ -46,7 +46,7 @@ async def initializeUserData(userID: str, accessToken: str):
                 database.setDataStatus(userID, algoName, 'failed', str(e))
 
 # method that is called when we want to recommend songs to the user, chooses a algorithm to pick out songs
-def recommendSongs(userID: str, accessToken: str, numSongs: int) -> list[dict[str, any]] | None:
+def recommendSongs(userID: str, accessToken: str, location: str, numSongs: int) -> list[dict[str, any]] | None:
     if (algorithms['topItems']['active']):
         topItemsAlgo = algorithms['topItems']
         topItems = database.getUserSpotifyData(userID, topItemsAlgo['name'])
@@ -54,13 +54,28 @@ def recommendSongs(userID: str, accessToken: str, numSongs: int) -> list[dict[st
         numSongsPerQuery = numSongs // queries
         step = numSongs % queries
         songURIS: list[dict] = []
+        if (location == 'Bar'):
+            params = {
+                'target_danceability': 0.7,
+                'target_energy': 0.7,
+                'seed_genres': 'Pop,Hip-Hop',
+                'min_popularity': 50
+            }
+        elif (location == 'Library'):
+            params = {
+                'target_instrumentalness': 0.9,
+                'target_danceability': 0.1,
+                'max_loudness': -10.0,
+                'seed_genres': 'Lo-Fi,Classical Piano',
+                'min_popularity': 10
+            }
+        else:
+            params = {}
         for i in range(queries):
             choice = random.choices(['topArtists', 'topTracks'])[0]
             itemURI = random.choices(topItems[choice])[0]
             itemID = itemURI.split(':')[2]
-            params = {
-                'limit': numSongsPerQuery + (1 if (i<step) else 0)
-            }
+            params['limit'] =  numSongsPerQuery + (1 if (i<step) else 0)
             if (choice == 'topArtists'):
                 params['seed_artists'] = itemID
             else:
