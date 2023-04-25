@@ -8,12 +8,62 @@ from langchain import LLMMathChain, SerpAPIWrapper
 from langchain.prompts import PromptTemplate
 import spotify
 
-def getResponse(query):
-    print(query)
-
 credentials_json = json.load(open("credentials.json"))
 OPENAI_SECRET_KEY = credentials_json["openai_secret_key"]
 del credentials_json
+
+def search_spotify_for_artist(artist_name, access_token):
+        userHeader = {
+            'Authorization': 'Bearer ' + access_token,
+            'Content-Type': 'application/json'
+        }
+        
+        params = {
+            'q': artist_name,
+            'type': 'artist',
+            'limit': 1,
+        }
+        res = httpx.get("https://api.spotify.com/v1/search", params=params, headers=userHeader).json()
+        
+        id = ''
+        name = ''
+                
+        if len(res['artists']['items']) == 0:
+            return None
+        else:
+            id = res['artists']['items'][0]['id']
+            name = res['artists']['items'][0]['name']
+            return id
+
+# Takes a string with 0-n artist names. Returns an array of artist IDs
+# This is the function for demo mode
+def getArtistIds(query, access_token):
+        llm = OpenAI(temperature=0.05, openai_api_key=OPENAI_SECRET_KEY)
+        artist_names = llm.generate([
+            f"""Extract music artists names from a sentence: {query}. With this extracted info, return a comma separated list of artist names from the input.
+             If there are no artist names in the answer provided should be the word 'empty' with nothing else. Provide the answer as just the list with no preamble.
+            """
+        ])
+        artist_names = artist_names.generations[0][0].text # Pull out response
+        artist_names = artist_names.replace('\n', '')
+        artist_names = artist_names.lower()
+        if artist_names == 'empty':
+            return []
+        else:
+            answer = []
+            artist_names = artist_names.split(',')
+            for artist in artist_names:
+                artist_id = search_spotify_for_artist(artist, access_token)
+                if artist_id is not None:
+                    answer.append(artist_id)
+        # artist_names = artist_names.replace('answer: ', '') # Remove the assignment at the front of the response
+            return answer
+        # search_params = json.loads(search_params) # Parse the response into an object
+        # self.search_spotify(search_params)
+        # return search_params
+
+def getResponse(query):
+    print(query)
 
 class Chain:
     def __init__(self, access_token):
