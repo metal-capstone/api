@@ -9,6 +9,7 @@ class Session(TypedDict):
     accessToken: str
     userID: str
     webSocket: WebSocket
+    location: str
 
 class MessageTypes(dict):
     INFO = 0

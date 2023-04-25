@@ -2,9 +2,9 @@ import location
 import database
 import spotify
 
-def weightSongs(userID, token):
+def weightSongs(userID, token, location):
 
-    placeType = location.getPlace()
+    placeType = location
 
     placeValues = database.getPlaceData(placeType)
 

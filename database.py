@@ -83,7 +83,7 @@ def getUserSpotifyData(userID: str, dataName: str) -> dict[str, any]:
     return userSpotifyData
 
 def getPlaceData(placeType: str) -> dict[str, any]:
-    placeValues = PLACES_CLUSTER['PlaceType'].find_one({'Place': placeType})
+    placeValues = PLACES_CLUSTER['PlaceType'].find_one({'Place': placeType.lower()})
     return placeValues
 
 def getUserSongs(songQuery):
