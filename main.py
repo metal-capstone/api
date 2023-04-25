@@ -58,7 +58,7 @@ async def root(request: Request) -> RedirectResponse:
         # random state to check if callback request is legitimate upon return
         state = secrets.token_urlsafe(16)
         states.add(state)
-        authorizeLink = spotify.generateAuthLink(state, (True)) #'sessionID' not in request.cookies
+        authorizeLink = spotify.generateAuthLink(state, (False)) #'sessionID' not in request.cookies
         return RedirectResponse(url=authorizeLink)
     except Exception as e:
         return RedirectResponse(f"http://localhost:3000/?error={e}", status_code=303)
@@ -108,10 +108,9 @@ async def websocket_endpoint(webSocket: WebSocket):
         sessionID = webSocket.cookies['sessionID']
         # Attempt to start session with session manager
         await sessions.startSession(sessionID, webSocket)
-
+        await sessions.startDemo(sessionID)
         # Constant check to only accept messages if session is valid. Wont enter if session never started
         while sessions.validSession(sessionID):
-            await sessions.startDemo(sessionID)
             requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
 
             # handle message commands and actions

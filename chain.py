@@ -31,7 +31,7 @@ def search_spotify_for_artist(artist_name, access_token):
         if len(res['artists']['items']) == 0:
             return None
         else:
-            id = res['artists']['items'][0]['id']
+            id = res['artists']['items'][0]['uri']
             name = res['artists']['items'][0]['name']
             return id
 

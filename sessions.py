@@ -3,6 +3,7 @@ from models import Session, LoginMessage, SessionNotFoundMessage, BaseDataMessag
 import spotify
 import database
 import dataHandler
+import chain
 
 # Object that tracks all current sessions, stores each session in a Session object with needed data
 class SessionManager:
@@ -54,7 +55,9 @@ class SessionManager:
         webSocket = self.getWebSocket(sessionID)
         await webSocket.send_json({"type": MessageTypes.MESSAGE, "detail": "Hello! I am Spotify Chatbot, could you give me the names of some of the artists you listen to?"})
         requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
-        # call lang
+        while (requestMessage['type'] != MessageTypes.MESSAGE):
+            requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
+        artists = chain.getArtistIds(requestMessage['detail'], self.getAccessToken(sessionID))
         dataHandler.initDataDemo(self.getUserID(sessionID), artists)
         await webSocket.send_json({"type": MessageTypes.MESSAGE, "detail": "Awesome I will take note of that. What location would you like to be at? (Only Bar and Library are supported)"})
         requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
@@ -62,11 +65,16 @@ class SessionManager:
             await webSocket.send_json({"type": MessageTypes.MESSAGE, "detail": "Sorry I didn't understand that, Only Bar and Library are supported locations for the demo. Please try again."})
             requestMessage: WebSocketMessage = await webSocket.receive_json() # Get message
         self.setLocation(sessionID, requestMessage['detail'].title())
+        await webSocket.send_json({"type": MessageTypes.MESSAGE, "detail": f"Okay I will act like you are at a {requestMessage['detail'].title()} for your recommendations. You can now ask me for recommendations by saying \"Play new music\" or \"Make me a playlist\", to play music from any artist, album, or song, ask \"Play music from the artist x\" or \"Play the song x by x\"."})
             
     def validSession(self, sessionID: str) -> bool:
         return sessionID in self.activeSessions
 
     def disconnectSession(self, sessionID: str):
+        user_id = self.getUserID(sessionID)
+        database.clearUser(user_id)
+        database.clearUserSpotifyData(user_id)
+        self.disconnectSession(sessionID)
         if (self.validSession(sessionID)):
             self.activeSessions.pop(sessionID)
 

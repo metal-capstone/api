@@ -108,7 +108,7 @@ def handleCommand(data: CommandDetail, session_id: str, sessions: SessionManager
                 sessions.disconnectSession(session_id)
                 return WebSocketMessage(type=MessageTypes.INFO, detail=f"User ({user_id}) successfully cleared from db. Logging out")
             else:
-                return WebSocketMessage(type=MessageTypes.ERROR, detail=f"Error: Unknown user command ({data['message'][0]})")
+                return WebSocketMessage(type=MessageTypes.ERROR, detail=f"Error: Unknown user command ({data['detail'][0]})")
             
         case '!location':
             if (not data['params']): # no params
