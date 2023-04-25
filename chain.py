@@ -7,7 +7,6 @@ from langchain.llms import OpenAI
 from langchain import LLMMathChain, SerpAPIWrapper
 from langchain.prompts import PromptTemplate
 import spotify
-from messageHandler import handleAction
 
 credentials_json = json.load(open("credentials.json"))
 OPENAI_SECRET_KEY = credentials_json["openai_secret_key"]
@@ -96,11 +95,11 @@ class Chain:
         ]
         self.agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 
-    def playMusic(self):
-        handleAction('Start Music Action', self.sessionID, self.sessions)
+    def playMusic(self, temp):
+        return self.sessions.handleAction('Start Music Action', self.sessionID)
     
-    def makePlaylist(self):
-        handleAction('Make A Playlist', self.sessionID, self.sessions)
+    def makePlaylist(self, temp):
+        return self.sessions.handleAction('Make A Playlist', self.sessionID)
 
     def interactWithPlayback(self, query):
         print(query)

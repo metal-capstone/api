@@ -4,6 +4,8 @@ import spotify
 import database
 import dataHandler
 import chain
+import weighting
+from dataHandler import recommendSongs
 
 # Object that tracks all current sessions, stores each session in a Session object with needed data
 class SessionManager:
@@ -67,6 +69,28 @@ class SessionManager:
         self.setLocation(sessionID, requestMessage['detail'].title())
         await webSocket.send_json({"type": MessageTypes.MESSAGE, "detail": f"Okay I will act like you are at a {requestMessage['detail'].title()} for your recommendations. You can now ask me for recommendations by saying \"Play new music\" or \"Make me a playlist\", to play music from any artist, album, or song, ask \"Play music from the artist x\" or \"Play the song x by x\"."})
             
+    # Action handler, perform certain actions based on chatbot response, always returns a response
+    def handleAction(self, text: str, session_id: str):
+        webSocket = self.getWebSocket(session_id)
+        match text:
+            case 'Start Music Action':
+                location = self.getLocation(session_id)
+                songs = recommendSongs(self.getUserID(session_id), self.getAccessToken(session_id), location, 5)
+                songURIs = [song['uri'] for song in songs]
+                songNames = [song['name'] for song in songs]
+                spotify.playSong(self.getAccessToken(session_id), songURIs)
+                return f"Playing Songs based off of your location ({location}) and listening history. Queued 5"
+
+            case 'Make A Playlist':
+                location = self.getLocation(session_id)
+                userID = self.getUserID(session_id)
+                messageText = weighting.weightSongs(userID, self.getAccessToken(session_id), location)['txt']
+                return messageText
+
+            # no action for text, send plain chatbot message
+            case _:
+                return text
+
     def validSession(self, sessionID: str) -> bool:
         return sessionID in self.activeSessions
 
