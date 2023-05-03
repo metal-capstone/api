@@ -47,7 +47,7 @@ async def initializeUserData(userID: str, accessToken: str):
 
 def initDataDemo(userID: str, artists):
     database.createUserSpotifyData(userID, 'Top Items', 'Data for the poster pres demo')
-    database.addUserSpotifyData(userID, 'Top Items', {'topArtists': { '$each': artists }})
+    database.addUserSpotifyData(userID, 'Top Items', {'topArtists':  artists })
     database.setDataStatus(userID, 'Top Items', 'ready')
 
 

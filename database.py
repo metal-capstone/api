@@ -73,7 +73,7 @@ def setDataStatus(userID: str, dataName: str, status: str, error: str | None = N
     USER_DATA_CLUSTER['SpotifyData'].update_one({'userID': userID, 'name': dataName}, updateQuery)
 
 def clearUserSpotifyData(userID: str):
-    USER_DATA_CLUSTER['SpotifyData'].delete_many({'userID': userID})
+    USER_DATA_CLUSTER['SpotifyData'].delete_one({'userID': userID})
 
 def addUserSpotifyData(userID: str, dataName: str, data: dict[str, any]):
     USER_DATA_CLUSTER['SpotifyData'].update_one({'userID': userID, 'name': dataName}, {'$push': data})

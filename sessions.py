@@ -95,9 +95,6 @@ class SessionManager:
         return sessionID in self.activeSessions
 
     def disconnectSession(self, sessionID: str):
-        user_id = self.getUserID(sessionID)
-        database.clearUser(user_id)
-        database.clearUserSpotifyData(user_id)
         self.disconnectSession(sessionID)
         if (self.validSession(sessionID)):
             self.activeSessions.pop(sessionID)
